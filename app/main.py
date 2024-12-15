@@ -1,15 +1,15 @@
 import logging
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import Request, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
 from app.db_manager.elasticsearch_store import MyElasticsearchVectorStore
-from app.db_manager.postgres_store import PostgresStore
+from app.db_manager.postgres_store import DatabaseManager
+from app.models.investigador import JsonDataPayload, ElasticsearchQueryPayload, PaginatedResponse, InvestigadorPayload
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -18,10 +18,36 @@ load_dotenv()
 
 app = FastAPI()
 
+db_config = {
+    'database': os.getenv('DB_NAME'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'host': os.getenv('DB_HOST'),
+    'port': os.getenv('DB_PORT')
+}
+
 # Instancias globales
 es_store = MyElasticsearchVectorStore()
-pg_store = PostgresStore()
+db_manager = DatabaseManager(db_config)
 
+@app.on_event("startup")
+async def startup_event():
+    """Inicializar conexiones al arrancar la aplicación"""
+    try:
+        await db_manager.initialize()
+        logger.info("Database connection pool initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database connection pool: {e}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cerrar conexiones al detener la aplicación"""
+    try:
+        await db_manager.cleanup()
+        logger.info("Database connections cleaned up successfully")
+    except Exception as e:
+        logger.error(f"Error cleaning up database connections: {e}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,35 +57,21 @@ app.add_middleware(
     allow_headers=["*"],  # Permite todos los headers
 )
 
-class ElasticsearchQueryPayload(BaseModel):
-    query: str
-    filters: Optional[dict] = None
-    k: Optional[int] = 20
-
-
-class JsonDataPayload(BaseModel):
-    data: List[Dict[str, Any]]
-
-
-class PaginatedResponse(BaseModel):
-    items: List[Dict[str, Any]]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int
-
-
-class InvestigadorPayload(BaseModel):
-    name: str
-    email: str
-    phone: Optional[str] = None
-    agent: str  # Este es el agent_id
-
+@app.get("/database/metrics")
+async def get_database_metrics():
+    """Endpoint para monitorear el estado de las conexiones"""
+    try:
+        metrics = await db_manager.get_connection_metrics()
+        return JSONResponse(content=metrics)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting database metrics: {str(e)}"
+        )
 
 @app.post("/upload-json/elasticsearch")
 async def upload_json_elasticsearch(payload: JsonDataPayload):
     try:
-        # Extraer directamente el array de datos del primer elemento
         json_items = payload.data[0]['json']['data']
 
         if not json_items:
@@ -72,7 +84,7 @@ async def upload_json_elasticsearch(payload: JsonDataPayload):
         es_documents = es_store.process_json_data(json_items)
 
         # Procesar el JSON con PostgreSQL
-        pg_documents = pg_store.process_json_data(json_items)
+        pg_documents = await db_manager.process_json_data(json_items)
 
         return {
             "status": "success",
@@ -84,7 +96,6 @@ async def upload_json_elasticsearch(payload: JsonDataPayload):
     except Exception as e:
         logger.error(f"Error al procesar el JSON: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar el JSON: {str(e)}")
-
 
 @app.post("/query/hybrid-search")
 async def process_hybrid_search(payload: ElasticsearchQueryPayload):
@@ -112,17 +123,15 @@ async def process_hybrid_search(payload: ElasticsearchQueryPayload):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la consulta: {str(e)}")
 
-
 @app.get("/agents/metadata")
 async def get_agents_metadata():
     try:
-        return pg_store.get_metadata()
+        return await db_manager.get_metadata()
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener metadata: {str(e)}"
         )
-
 
 @app.get("/agents", response_model=PaginatedResponse)
 async def get_agents(
@@ -133,7 +142,7 @@ async def get_agents(
     search: Optional[str] = Query(None, description="Búsqueda por nombre o descripción")
 ):
     try:
-        return pg_store.get_agents(page, page_size, category, industry, search)
+        return await db_manager.get_agents(page, page_size, category, industry, search)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -181,7 +190,7 @@ async def create_investigador(payload: InvestigadorPayload):
             "agent_id": payload.agent
         }
 
-        result = pg_store.create_investigador(investigador_data)
+        result = await db_manager.create_investigador(investigador_data)
 
         return {
             "status": "success",
@@ -197,11 +206,9 @@ async def create_investigador(payload: InvestigadorPayload):
             detail=f"Error al crear investigador: {str(e)}"
         )
 
-
 @app.get("/health")
 async def health_check():
     return {"status": "OK"}
-
 
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
