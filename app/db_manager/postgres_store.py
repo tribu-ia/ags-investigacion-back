@@ -39,7 +39,7 @@ class DatabaseManager:
                     )
 
                     async with self.pool.acquire() as conn:
-                        # Crear tabla de agentes si no existe
+                        # Crear tabla de agentes con restricciones UNIQUE
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS ai_agents (
                                 id TEXT PRIMARY KEY,
@@ -64,14 +64,16 @@ class DatabaseManager:
                                 upvoters JSONB DEFAULT '[]'::jsonb,
                                 approved BOOLEAN DEFAULT false,
                                 created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                                 slug TEXT,
                                 version TEXT,
                                 featured BOOLEAN DEFAULT false,
-                                raw_data JSONB
+                                UNIQUE(name),
+                                UNIQUE(slug)
                             )
                         ''')
 
-                        # Crear tabla de investigadores si no existe
+                        # Crear tabla de investigadores
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS investigadores (
                                 id TEXT PRIMARY KEY,
@@ -82,7 +84,7 @@ class DatabaseManager:
                             )
                         ''')
 
-                        # Crear tabla de asignaciones si no existe
+                        # Crear tabla de asignaciones
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS agent_assignments (
                                 id SERIAL PRIMARY KEY,
@@ -93,10 +95,11 @@ class DatabaseManager:
                                 CONSTRAINT unique_active_assignment UNIQUE (agent_id)
                             )
                         ''')
+
                         print("Pool and tables created successfully")
                         return
 
-                except (asyncpg.ConnectionDoesNotExistError, asyncpg.PostgresConnectionError) as e:
+                except Exception as e:
                     last_error = e
                     print(f"Connection attempt {attempt + 1} failed: {e}")
                     if self.pool:
@@ -169,83 +172,134 @@ class DatabaseManager:
             }
         }
 
-    async def process_json_data(self, json_data: List[Dict]) -> List[Dict]:
-        """Procesa y almacena los datos JSON en PostgreSQL usando inserción masiva"""
-        processed_items = []
-        agents_to_insert = []
-
-        # Preparar todos los agentes para inserción masiva
-        for item_data in json_data:
+    async def process_json_data(self, json_items):
+        valid_documents = []
+        
+        logger.info(f"Procesando {len(json_items)} documentos")
+        
+        for item in json_items:
             try:
-                agent = AIAgent(
-                    id=str(uuid.uuid4()),
-                    name=item_data.get('name', ''),
-                    created_by=item_data.get('created_by', ''),
-                    website=item_data.get('website', ''),
-                    access=item_data.get('access', ''),
-                    pricing_model=item_data.get('pricing_model', ''),
-                    category=item_data.get('category', ''),
-                    industry=item_data.get('industry', ''),
-                    short_description=item_data.get('short_description', ''),
-                    long_description=item_data.get('long_description', ''),
-                    key_features=item_data.get('key_features', []),
-                    use_cases=item_data.get('use_cases', []),
-                    tags=item_data.get('tags', []),
-                    logo=item_data.get('logo', ''),
-                    logo_file_name=item_data.get('logo_file_name', ''),
-                    image=item_data.get('image', ''),
-                    image_file_name=item_data.get('image_file_name', ''),
-                    video=item_data.get('video', ''),
-                    upvotes=item_data.get('upvotes', 0),
-                    upvoters=item_data.get('upvoters', []),
-                    approved=item_data.get('approved', False),
-                    created_at=datetime.now(),
-                    slug=item_data.get('slug', ''),
-                    version=str(item_data.get('version', '')),
-                    featured=item_data.get('featured', False)
-                )
-
-                if agent.id:
-                    # Preparar los valores para la inserción masiva
-                    agents_to_insert.append((
-                        agent.id, agent.name, agent.created_by, agent.website,
-                        agent.access, agent.pricing_model, agent.category,
-                        agent.industry, agent.short_description, agent.long_description,
-                        json.dumps(agent.key_features), json.dumps(agent.use_cases),
-                        json.dumps(agent.tags), agent.logo, agent.logo_file_name,
-                        agent.image, agent.image_file_name, agent.video,
-                        agent.upvotes, json.dumps(agent.upvoters), agent.approved,
-                        agent.created_at, agent.slug, agent.version,
-                        agent.featured
-                    ))
-                    processed_items.append(item_data)
-                else:
-                    print(f"Error: ID no válido para el agente {agent.name}")
+                # Validar que los campos requeridos no estén vacíos
+                if not self._is_valid_document(item):
+                    logger.warning(f"Documento inválido o vacío encontrado, saltando: {item.get('name', 'Unknown')}")
+                    continue
+                    
+                # Convertir campos que pueden ser None a valores por defecto apropiados
+                document = {
+                    'id': item.get('id', str(uuid.uuid4())),
+                    'name': item.get('name'),
+                    'created_by': item.get('createdBy', ''),
+                    'website': item.get('website', ''),
+                    'access': item.get('access', ''),
+                    'pricing_model': item.get('pricingModel', ''),
+                    'category': item.get('category', ''),
+                    'industry': item.get('industry', ''),
+                    'short_description': item.get('shortDescription', ''),
+                    'long_description': item.get('longDescription', ''),
+                    'key_features': item.get('keyFeatures', []),
+                    'use_cases': item.get('useCases', []),
+                    'tags': item.get('tags', []),
+                    'logo': item.get('logo', ''),
+                    'logo_file_name': item.get('logoFileName', ''),
+                    'image': item.get('image', ''),
+                    'image_file_name': item.get('imageFileName', ''),
+                    'video': item.get('video', ''),
+                    'upvotes': item.get('upvotes', 0),
+                    'upvoters': item.get('upvoters', []),
+                    'approved': item.get('approved', False),
+                    'created_at': datetime.now(),
+                    'slug': item.get('slug', ''),
+                    'version': str(item.get('version', '')),
+                    'featured': item.get('featured', False)
+                }
+                
+                # Asegurar que los campos JSONB sean listas o diccionarios válidos
+                if isinstance(document['key_features'], str):
+                    document['key_features'] = [x.strip() for x in document['key_features'].split(',')]
+                if isinstance(document['use_cases'], str):
+                    document['use_cases'] = [x.strip() for x in document['use_cases'].split(',')]
+                if isinstance(document['tags'], str):
+                    document['tags'] = [x.strip() for x in document['tags'].split(',')]
+                if document['tags'] is None:
+                    document['tags'] = []
+                if isinstance(document['upvoters'], str):
+                    document['upvoters'] = [document['upvoters']]
+                
+                valid_documents.append(document)
+                logger.debug(f"Documento procesado exitosamente: {document['name']}")
+                
             except Exception as e:
-                print(f"Error al procesar {item_data.get('name', 'Unknown')}: {str(e)}")
+                logger.error(f"Error procesando documento {item.get('name', 'Unknown')}: {str(e)}")
                 continue
 
-        try:
-            if agents_to_insert:
-                async with self.pool.acquire() as conn:
-                    # Realizar la inserción masiva
-                    await conn.executemany('''
-                        INSERT INTO ai_agents (
-                            id, name, created_by, website, access, pricing_model,
-                            category, industry, short_description, long_description,
-                            key_features, use_cases, tags, logo, logo_file_name,
-                            image, image_file_name, video, upvotes, upvoters,
-                            approved, created_at, slug, version, featured
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                                $21, $22, $23, $24, $25)
-                    ''', agents_to_insert)
-                print(f"Se insertaron {len(agents_to_insert)} agentes exitosamente")
-        except Exception as e:
-            print(f"Error en la inserción masiva: {str(e)}")
+        logger.info(f"Se procesaron {len(valid_documents)} documentos válidos de {len(json_items)} totales")
+
+        if not valid_documents:
             return []
 
-        return processed_items
+        try:
+            async with self.pool.acquire() as conn:
+                # Realizar la inserción masiva
+                await conn.executemany('''
+                    INSERT INTO ai_agents (
+                        id, name, created_by, website, access, pricing_model,
+                        category, industry, short_description, long_description,
+                        key_features, use_cases, tags, logo, logo_file_name,
+                        image, image_file_name, video, upvotes, upvoters,
+                        approved, created_at, slug, version, featured
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+                            $21, $22, $23, $24, $25)
+                    ON CONFLICT (name) DO UPDATE SET
+                        created_by = EXCLUDED.created_by,
+                        website = EXCLUDED.website,
+                        access = EXCLUDED.access,
+                        pricing_model = EXCLUDED.pricing_model,
+                        category = EXCLUDED.category,
+                        industry = EXCLUDED.industry,
+                        short_description = EXCLUDED.short_description,
+                        long_description = EXCLUDED.long_description,
+                        key_features = EXCLUDED.key_features,
+                        use_cases = EXCLUDED.use_cases,
+                        tags = EXCLUDED.tags,
+                        logo = EXCLUDED.logo,
+                        logo_file_name = EXCLUDED.logo_file_name,
+                        image = EXCLUDED.image,
+                        image_file_name = EXCLUDED.image_file_name,
+                        video = EXCLUDED.video,
+                        upvotes = EXCLUDED.upvotes,
+                        upvoters = EXCLUDED.upvoters,
+                        approved = EXCLUDED.approved,
+                        slug = EXCLUDED.slug,
+                        version = EXCLUDED.version,
+                        featured = EXCLUDED.featured,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', [(
+                    doc['id'], doc['name'], doc['created_by'], doc['website'],
+                    doc['access'], doc['pricing_model'], doc['category'],
+                    doc['industry'], doc['short_description'], doc['long_description'],
+                    json.dumps(doc['key_features']), json.dumps(doc['use_cases']),
+                    json.dumps(doc['tags']), doc['logo'], doc['logo_file_name'],
+                    doc['image'], doc['image_file_name'], doc['video'],
+                    doc['upvotes'], json.dumps(doc['upvoters']), doc['approved'],
+                    doc['created_at'], doc['slug'], doc['version'],
+                    doc['featured']
+                ) for doc in valid_documents])
+                
+                return valid_documents
+                
+        except Exception as e:
+            logger.error(f"Error en la inserción masiva: {str(e)}")
+            raise
+
+    def _is_valid_document(self, item):
+        """Validar campos requeridos para ambas bases de datos"""
+        required_fields = ['name', 'category', 'industry', 'shortDescription']
+        
+        for field in required_fields:
+            if not item.get(field) or str(item.get(field)).strip() == '':
+                return False
+        return True
 
     async def check_agent_availability(self, agent_id: str) -> dict:
         """Verifica si un agente está disponible y obtiene información de asignación"""
@@ -254,7 +308,8 @@ class DatabaseManager:
                 SELECT 
                     i.name as investigador_name,
                     i.email as investigador_email,
-                    aa.assigned_at
+                    aa.assigned_at,
+                    aa.status
                 FROM agent_assignments aa
                 JOIN investigadores i ON aa.investigador_id = i.id
                 WHERE aa.agent_id = $1 AND aa.status = 'active'
@@ -266,13 +321,25 @@ class DatabaseManager:
                     "current_assignment": {
                         "investigador_name": result[0]['investigador_name'],
                         "investigador_email": result[0]['investigador_email'],
-                        "assigned_at": result[0]['assigned_at']
+                        "assigned_at": result[0]['assigned_at'],
+                        "status": result[0]['status']
                     }
                 }
-            return {"available": True}
+            
+            # Verificar si el agente existe
+            agent = await self.execute_query('SELECT id FROM ai_agents WHERE id = $1', agent_id)
+            if not agent:
+                raise ValueError(f"El agente seleccionado no existe")
+                
+            return {
+                "available": True,
+                "message": "Agente disponible para asignación"
+            }
+        except ValueError as ve:
+            raise ve
         except Exception as e:
-            print(f"Error checking agent availability: {e}")
-            raise
+            logger.error(f"Error verificando disponibilidad del agente: {str(e)}")
+            raise ValueError("Error al verificar la disponibilidad del agente. Por favor, inténtelo nuevamente.")
 
     async def assign_agent_to_investigador(self, investigador_id: str, agent_id: str) -> bool:
         """Asigna un agente a un investigador si está disponible"""
@@ -296,17 +363,14 @@ class DatabaseManager:
                          industry: str = None, search: str = None) -> Dict:
         """Obtiene los agentes con paginación, filtros e información de asignación"""
         try:
-            # Construir la query base con información de asignación
+            # Query simplificada
             query = """
                 SELECT 
                     a.*,
-                    CASE 
-                        WHEN aa.id IS NOT NULL THEN true 
-                        ELSE false 
-                    END as is_assigned,
+                    aa.status as assignment_status,
+                    aa.assigned_at,
                     i.name as assigned_to_name,
-                    i.email as assigned_to_email,
-                    aa.assigned_at
+                    i.email as assigned_to_email
                 FROM ai_agents a
                 LEFT JOIN agent_assignments aa ON a.id = aa.agent_id AND aa.status = 'active'
                 LEFT JOIN investigadores i ON aa.investigador_id = i.id
@@ -339,31 +403,42 @@ class DatabaseManager:
             # Formatear resultados
             items = []
             for row in results:
+                # Si hay status de asignación, está asignado
+                is_assigned = row['assignment_status'] == 'active'
+                
                 agent_dict = {
                     "id": row['id'],
                     "name": row['name'],
+                    "createdBy": row['created_by'],
+                    "website": row['website'],
+                    "access": row['access'],
+                    "pricingModel": row['pricing_model'],
                     "category": row['category'],
                     "industry": row['industry'],
                     "shortDescription": row['short_description'],
                     "longDescription": row['long_description'],
-                    "website": row['website'],
-                    "access": row['access'],
-                    "pricingModel": row['pricing_model'],
                     "keyFeatures": row['key_features'],
                     "useCases": row['use_cases'],
                     "tags": row['tags'],
                     "logo": row['logo'],
+                    "logoFileName": row['logo_file_name'],
                     "image": row['image'],
+                    "imageFileName": row['image_file_name'],
                     "video": row['video'],
                     "upvotes": row['upvotes'],
+                    "upvoters": row['upvoters'],
+                    "approved": row['approved'],
                     "createdAt": row['created_at'],
+                    "updatedAt": row['updated_at'],
+                    "slug": row['slug'],
+                    "version": row['version'],
                     "featured": row['featured'],
-                    "is_assigned": row['is_assigned'],
-                    "assignment_info": {
-                        "assigned_to": row['assigned_to_name'],
-                        "assigned_email": row['assigned_to_email'],
-                        "assigned_at": row['assigned_at']
-                    } if row['is_assigned'] else None
+                    "isAssigned": is_assigned,
+                    "assignmentInfo": {
+                        "assignedTo": row['assigned_to_name'],
+                        "assignedEmail": row['assigned_to_email'],
+                        "assignedAt": row['assigned_at']
+                    } if is_assigned else None
                 }
                 items.append(agent_dict)
 
@@ -400,38 +475,106 @@ class DatabaseManager:
     async def create_investigador(self, investigador_data: Dict) -> Dict:
         """Crea un nuevo investigador y asigna el agente si está disponible"""
         try:
+            # Validar datos requeridos
+            required_fields = ['name', 'email', 'agent_id']
+            for field in required_fields:
+                if not investigador_data.get(field):
+                    return {
+                        "success": False,
+                        "message": f"El campo {field} es requerido",
+                        "error_type": "validation_error",
+                        "error_code": "MISSING_FIELD",
+                        "field": field
+                    }
+
+            # Verificar si el investigador ya existe
+            existing_investigador = await self.execute_query(
+                "SELECT email FROM investigadores WHERE email = $1",
+                investigador_data['email']
+            )
+            
+            if existing_investigador:
+                return {
+                    "success": False,
+                    "message": "Ya existe una cuenta registrada con este correo electrónico",
+                    "error_type": "validation_error",
+                    "error_code": "EMAIL_EXISTS",
+                    "field": "email"
+                }
+
             # Verificar que el agente existe y está disponible
             agent_id = investigador_data['agent_id']
             availability = await self.check_agent_availability(agent_id)
 
             if not availability["available"]:
-                raise ValueError(
-                    f"El agente ya está asignado a {availability['current_assignment']['investigador_name']} "
-                    f"({availability['current_assignment']['investigador_email']})"
-                )
+                assignment = availability['current_assignment']
+                return {
+                    "success": False,
+                    "message": f"El agente ya está asignado a {assignment['investigador_name']}",
+                    "error_type": "validation_error",
+                    "error_code": "AGENT_ASSIGNED",
+                    "field": "agent_id",
+                    "current_assignment": {
+                        "investigador_name": assignment['investigador_name'],
+                        "investigador_email": assignment['investigador_email'],
+                        "assigned_at": assignment['assigned_at']
+                    }
+                }
 
-            # Crear investigador
-            investigador_id = str(uuid.uuid4())
-            await self.execute_query("""
-                INSERT INTO investigadores (id, name, email, phone)
-                VALUES ($1, $2, $3, $4)
-            """, investigador_id, investigador_data['name'],
-                                     investigador_data['email'], investigador_data.get('phone', ''))
+            try:
+                # Crear investigador
+                investigador_id = str(uuid.uuid4())
+                await self.execute_query("""
+                    INSERT INTO investigadores (id, name, email, phone)
+                    VALUES ($1, $2, $3, $4)
+                """, investigador_id, investigador_data['name'],
+                                         investigador_data['email'], investigador_data.get('phone', ''))
+            except asyncpg.UniqueViolationError:
+                return {
+                    "success": False,
+                    "message": "Ya existe una cuenta registrada con este correo electrónico",
+                    "error_type": "validation_error",
+                    "error_code": "EMAIL_EXISTS",
+                    "field": "email"
+                }
 
             # Asignar agente
-            await self.assign_agent_to_investigador(investigador_id, agent_id)
+            assignment_success = await self.assign_agent_to_investigador(investigador_id, agent_id)
+            
+            if not assignment_success:
+                # Si falla la asignación, eliminar el investigador creado
+                await self.execute_query(
+                    "DELETE FROM investigadores WHERE id = $1", 
+                    investigador_id
+                )
+                return {
+                    "success": False,
+                    "message": "No se pudo asignar el agente seleccionado",
+                    "error_type": "assignment_error",
+                    "error_code": "ASSIGNMENT_FAILED",
+                    "field": "agent_id"
+                }
 
             return {
-                "id": investigador_id,
-                "name": investigador_data['name'],
-                "email": investigador_data['email'],
-                "phone": investigador_data.get('phone', ''),
-                "agent_id": agent_id,
-                "status": "assigned"
+                "success": True,
+                "message": "¡Registro exitoso! Se ha creado tu cuenta y asignado el agente",
+                "error_type": None,
+                "error_code": None,
+                "data": {
+                    "id": investigador_id,
+                    "name": investigador_data['name'],
+                    "email": investigador_data['email'],
+                    "phone": investigador_data.get('phone', ''),
+                    "agent_id": agent_id,
+                    "status": "assigned"
+                }
             }
 
-        except ValueError as ve:
-            raise ve
         except Exception as e:
-            print(f"Error creating investigador: {e}")
-            raise
+            logger.error(f"Error inesperado creando investigador: {str(e)}")
+            return {
+                "success": False,
+                "message": "Ha ocurrido un error inesperado. Por favor, inténtelo más tarde",
+                "error_type": "server_error",
+                "error_code": "INTERNAL_ERROR"
+            }

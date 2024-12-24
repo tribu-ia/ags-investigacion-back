@@ -51,7 +51,7 @@ async def shutdown_event():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Origen de tu aplicación Next.js
+    allow_origins=["http://localhost:3000", "https://tribu.agentesdeia.info"],  # Origen de tu aplicación Next.js
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos los métodos
     allow_headers=["*"],  # Permite todos los headers
@@ -69,6 +69,31 @@ async def get_database_metrics():
             detail=f"Error getting database metrics: {str(e)}"
         )
 
+
+@app.post("/upload-json/elasticsearch2")
+async def upload_json_elasticsearch(payload: JsonDataPayload):
+    try:
+        json_items = payload.data[0]['json']['data']
+
+        if not json_items:
+            raise HTTPException(
+                status_code=400,
+                detail="No se encontraron datos válidos en el JSON"
+            )
+        # Procesar el JSON con Elasticsearch
+        es_documents = es_store.process_json_data(json_items)
+
+        return {
+            "status": "success",
+            "message": "JSON procesado correctamente",
+            "elasticsearch_items": len(es_documents),
+            "total_items_received": len(json_items)
+        }
+    except Exception as e:
+        logger.error(f"Error al procesar el JSON: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar el JSON: {str(e)}")
+
+
 @app.post("/upload-json/elasticsearch")
 async def upload_json_elasticsearch(payload: JsonDataPayload):
     try:
@@ -82,16 +107,19 @@ async def upload_json_elasticsearch(payload: JsonDataPayload):
 
         # Procesar el JSON con Elasticsearch
         es_documents = es_store.process_json_data(json_items)
-
+        
         # Procesar el JSON con PostgreSQL
         pg_documents = await db_manager.process_json_data(json_items)
+
+        skipped_items = len(json_items) - max(len(es_documents), len(pg_documents))
 
         return {
             "status": "success",
             "message": "JSON procesado correctamente",
             "elasticsearch_items": len(es_documents),
             "postgres_items": len(pg_documents),
-            "total_items_processed": len(json_items)
+            "skipped_items": skipped_items,
+            "total_items_received": len(json_items)
         }
     except Exception as e:
         logger.error(f"Error al procesar el JSON: {str(e)}")
