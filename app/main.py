@@ -1,9 +1,9 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, Dict
 
 from dotenv import load_dotenv
-from fastapi import Request, FastAPI, HTTPException, Query
+from fastapi import Request, FastAPI, HTTPException, Query, Body
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
@@ -247,4 +247,46 @@ async def catch_exceptions_middleware(request: Request, call_next):
         return JSONResponse(
             status_code=500,
             content={"message": "Internal server error"}
+        )
+
+@app.get("/stats")
+async def get_stats():
+    """Obtiene estadísticas de agentes e investigadores"""
+    try:
+        stats = await db_manager.get_stats()
+        return {
+            "status": "success",
+            "data": stats
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al obtener estadísticas"
+        )
+
+@app.post("/agents/{agent_id}/documentation")
+async def complete_agent_documentation(
+    agent_id: str,
+    documentation_data: Dict = Body(...),
+):
+    """Registra la documentación completada de un agente"""
+    try:
+        documentation_data['agent_id'] = agent_id
+        result = await db_manager.complete_agent_documentation(documentation_data)
+        
+        if not result['success']:
+            raise HTTPException(
+                status_code=400 if result['error_type'] == 'validation_error' else 500,
+                detail=result['message']
+            )
+            
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registrando documentación: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al registrar la documentación del agente"
         )
