@@ -84,6 +84,8 @@ class PaginatedResponse(BaseModel):
 
 class InvestigadorPayload(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     phone: Optional[str] = None
-    agent: str
+    agent: str  # ID del agente a asignar
+    github_username: str
+    linkedin_profile: Optional[str] = None

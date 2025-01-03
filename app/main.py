@@ -215,7 +215,9 @@ async def create_investigador(payload: InvestigadorPayload):
             "name": payload.name,
             "email": payload.email,
             "phone": payload.phone,
-            "agent_id": payload.agent
+            "agent_id": payload.agent,
+            "github_username": payload.github_username,
+            "linkedin_profile": payload.linkedin_profile
         }
 
         result = await db_manager.create_investigador(investigador_data)

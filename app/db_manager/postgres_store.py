@@ -1,11 +1,13 @@
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 from math import ceil
 import uuid
 import asyncpg
 import asyncio
 import json
+import os
+import aiohttp
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError
@@ -73,13 +75,17 @@ class DatabaseManager:
                             )
                         ''')
 
-                        # Crear tabla de investigadores
+                        # Crear tabla de investigadores con nuevos campos
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS investigadores (
                                 id TEXT PRIMARY KEY,
                                 name TEXT NOT NULL,
                                 email TEXT NOT NULL UNIQUE,
                                 phone TEXT,
+                                github_username TEXT,
+                                avatar_url TEXT,
+                                repository_url TEXT,
+                                linkedin_profile TEXT,
                                 created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
                             )
                         ''')
@@ -484,11 +490,41 @@ class DatabaseManager:
             logger.error(f"Error al obtener metadata: {str(e)}")
             raise
 
+    async def fetch_github_data(self, github_username: str) -> Optional[Dict]:
+        """Obtiene datos del usuario desde GitHub"""
+        github_token = os.getenv('GITHUB_TOKEN')
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(
+                    f'https://api.github.com/users/{github_username}',
+                    headers=headers
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return {
+                            'avatar_url': data.get('avatar_url'),
+                            'repository_url': data.get('html_url')
+                        }
+                    elif response.status == 404:
+                        return None
+                    else:
+                        logger.error(f"Error consultando GitHub API: {response.status}")
+                        return None
+            except Exception as e:
+                logger.error(f"Error en la conexión con GitHub: {str(e)}")
+                return None
+
     async def create_investigador(self, investigador_data: Dict) -> Dict:
         """Crea un nuevo investigador y asigna el agente si está disponible"""
         try:
             # Validar datos requeridos
-            required_fields = ['name', 'email', 'agent_id']
+            required_fields = ['name', 'email', 'agent_id', 'github_username']
             for field in required_fields:
                 if not investigador_data.get(field):
                     return {
@@ -514,6 +550,17 @@ class DatabaseManager:
                     "field": "email"
                 }
 
+            # Obtener datos de GitHub
+            github_data = await self.fetch_github_data(investigador_data['github_username'])
+            if not github_data:
+                return {
+                    "success": False,
+                    "message": "No se pudo verificar el usuario de GitHub. Por favor, verifica que el nombre de usuario sea correcto.",
+                    "error_type": "validation_error",
+                    "error_code": "INVALID_GITHUB_USER",
+                    "field": "github_username"
+                }
+
             # Verificar que el agente existe y está disponible
             agent_id = investigador_data['agent_id']
             availability = await self.check_agent_availability(agent_id)
@@ -534,13 +581,24 @@ class DatabaseManager:
                 }
 
             try:
-                # Crear investigador
+                # Crear investigador con datos de GitHub
                 investigador_id = str(uuid.uuid4())
                 await self.execute_query("""
-                    INSERT INTO investigadores (id, name, email, phone)
-                    VALUES ($1, $2, $3, $4)
-                """, investigador_id, investigador_data['name'],
-                                         investigador_data['email'], investigador_data.get('phone', ''))
+                    INSERT INTO investigadores (
+                        id, name, email, phone, github_username,
+                        avatar_url, repository_url, linkedin_profile
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                """, 
+                    investigador_id,
+                    investigador_data['name'],
+                    investigador_data['email'],
+                    investigador_data.get('phone', ''),
+                    investigador_data['github_username'],
+                    github_data['avatar_url'],
+                    github_data['repository_url'],
+                    investigador_data.get('linkedin_profile', '')
+                )
             except asyncpg.UniqueViolationError:
                 return {
                     "success": False,
@@ -577,6 +635,10 @@ class DatabaseManager:
                     "name": investigador_data['name'],
                     "email": investigador_data['email'],
                     "phone": investigador_data.get('phone', ''),
+                    "github_username": investigador_data['github_username'],
+                    "avatar_url": github_data['avatar_url'],
+                    "repository_url": github_data['repository_url'],
+                    "linkedin_profile": investigador_data.get('linkedin_profile', ''),
                     "agent_id": agent_id,
                     "status": "assigned"
                 }
