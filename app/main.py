@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(
+    title="Bella Bot Assistant",
+    description="API for Bella Bot Assistant",
+    version="1.0.0",
+    # Aquí defines el prefijo base para todas las rutas
+    root_path="/api/agents"
+)
 
 db_config = {
     'database': os.getenv('DB_NAME'),
@@ -48,14 +54,6 @@ async def shutdown_event():
         logger.info("Database connections cleaned up successfully")
     except Exception as e:
         logger.error(f"Error cleaning up database connections: {e}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://tribu.agentesdeia.info"],  # Origen de tu aplicación Next.js
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite todos los métodos
-    allow_headers=["*"],  # Permite todos los headers
-)
 
 @app.get("/database/metrics")
 async def get_database_metrics():
