@@ -1,9 +1,9 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, Dict
 
 from dotenv import load_dotenv
-from fastapi import Request, FastAPI, HTTPException, Query
+from fastapi import Request, FastAPI, HTTPException, Query, Body
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(
+    title="Bella Bot Assistant",
+    description="API for Bella Bot Assistant",
+    version="1.0.0",
+    # Aquí defines el prefijo base para todas las rutas
+    root_path="/api/agents"
+)
 
 db_config = {
     'database': os.getenv('DB_NAME'),
@@ -48,14 +54,6 @@ async def shutdown_event():
         logger.info("Database connections cleaned up successfully")
     except Exception as e:
         logger.error(f"Error cleaning up database connections: {e}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://tribu.agentesdeia.info"],  # Origen de tu aplicación Next.js
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite todos los métodos
-    allow_headers=["*"],  # Permite todos los headers
-)
 
 @app.get("/database/metrics")
 async def get_database_metrics():
@@ -215,7 +213,9 @@ async def create_investigador(payload: InvestigadorPayload):
             "name": payload.name,
             "email": payload.email,
             "phone": payload.phone,
-            "agent_id": payload.agent
+            "agent_id": payload.agent,
+            "github_username": payload.github_username,
+            "linkedin_profile": payload.linkedin_profile
         }
 
         result = await db_manager.create_investigador(investigador_data)
@@ -247,4 +247,46 @@ async def catch_exceptions_middleware(request: Request, call_next):
         return JSONResponse(
             status_code=500,
             content={"message": "Internal server error"}
+        )
+
+@app.get("/stats")
+async def get_stats():
+    """Obtiene estadísticas de agentes e investigadores"""
+    try:
+        stats = await db_manager.get_stats()
+        return {
+            "status": "success",
+            "data": stats
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al obtener estadísticas"
+        )
+
+@app.post("/agents/{agent_id}/documentation")
+async def complete_agent_documentation(
+    agent_id: str,
+    documentation_data: Dict = Body(...),
+):
+    """Registra la documentación completada de un agente"""
+    try:
+        documentation_data['agent_id'] = agent_id
+        result = await db_manager.complete_agent_documentation(documentation_data)
+        
+        if not result['success']:
+            raise HTTPException(
+                status_code=400 if result['error_type'] == 'validation_error' else 500,
+                detail=result['message']
+            )
+            
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registrando documentación: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al registrar la documentación del agente"
         )

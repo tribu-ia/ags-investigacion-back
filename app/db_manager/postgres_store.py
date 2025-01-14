@@ -1,11 +1,13 @@
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 from math import ceil
 import uuid
 import asyncpg
 import asyncio
 import json
+import os
+import aiohttp
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError
@@ -39,7 +41,7 @@ class DatabaseManager:
                     )
 
                     async with self.pool.acquire() as conn:
-                        # Crear tabla de agentes con restricciones UNIQUE
+                        # Crear tabla de agentes
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS ai_agents (
                                 id TEXT PRIMARY KEY,
@@ -73,18 +75,22 @@ class DatabaseManager:
                             )
                         ''')
 
-                        # Crear tabla de investigadores
+                        # Crear tabla de investigadores con nuevos campos
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS investigadores (
                                 id TEXT PRIMARY KEY,
                                 name TEXT NOT NULL,
                                 email TEXT NOT NULL UNIQUE,
                                 phone TEXT,
+                                github_username TEXT,
+                                avatar_url TEXT,
+                                repository_url TEXT,
+                                linkedin_profile TEXT,
                                 created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
                             )
                         ''')
 
-                        # Crear tabla de asignaciones
+                        # Crear tabla de asignaciones con restricción única compuesta
                         await conn.execute('''
                             CREATE TABLE IF NOT EXISTS agent_assignments (
                                 id SERIAL PRIMARY KEY,
@@ -92,7 +98,25 @@ class DatabaseManager:
                                 agent_id TEXT REFERENCES ai_agents(id),
                                 assigned_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                                 status TEXT DEFAULT 'active',
-                                CONSTRAINT unique_active_assignment UNIQUE (agent_id)
+                                CONSTRAINT unique_active_assignment UNIQUE (agent_id),
+                                CONSTRAINT unique_assignment_pair UNIQUE (agent_id, investigador_id)
+                            )
+                        ''')
+
+                        # Crear tabla de documentación
+                        await conn.execute('''
+                            CREATE TABLE IF NOT EXISTS agent_documentation (
+                                id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+                                agent_id TEXT,
+                                investigador_id TEXT,
+                                documentation_date TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                status TEXT DEFAULT 'completed',
+                                findings TEXT,
+                                recommendations TEXT,
+                                research_summary TEXT,
+                                research_data JSONB,
+                                FOREIGN KEY (agent_id, investigador_id) 
+                                    REFERENCES agent_assignments(agent_id, investigador_id)
                             )
                         ''')
 
@@ -106,14 +130,8 @@ class DatabaseManager:
                         await self.pool.close()
                         self.pool = None
                     if attempt < retry_count - 1:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                        await asyncio.sleep(2 ** attempt)
                     continue
-                except Exception as e:
-                    print(f"Unexpected error creating pool: {e}")
-                    if self.pool:
-                        await self.pool.close()
-                        self.pool = None
-                    raise
 
             if last_error:
                 raise last_error
@@ -472,11 +490,41 @@ class DatabaseManager:
             logger.error(f"Error al obtener metadata: {str(e)}")
             raise
 
+    async def fetch_github_data(self, github_username: str) -> Optional[Dict]:
+        """Obtiene datos del usuario desde GitHub"""
+        github_token = os.getenv('GITHUB_TOKEN')
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(
+                    f'https://api.github.com/users/{github_username}',
+                    headers=headers
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return {
+                            'avatar_url': data.get('avatar_url'),
+                            'repository_url': data.get('html_url')
+                        }
+                    elif response.status == 404:
+                        return None
+                    else:
+                        logger.error(f"Error consultando GitHub API: {response.status}")
+                        return None
+            except Exception as e:
+                logger.error(f"Error en la conexión con GitHub: {str(e)}")
+                return None
+
     async def create_investigador(self, investigador_data: Dict) -> Dict:
         """Crea un nuevo investigador y asigna el agente si está disponible"""
         try:
             # Validar datos requeridos
-            required_fields = ['name', 'email', 'agent_id']
+            required_fields = ['name', 'email', 'agent_id', 'github_username']
             for field in required_fields:
                 if not investigador_data.get(field):
                     return {
@@ -502,6 +550,17 @@ class DatabaseManager:
                     "field": "email"
                 }
 
+            # Obtener datos de GitHub
+            github_data = await self.fetch_github_data(investigador_data['github_username'])
+            if not github_data:
+                return {
+                    "success": False,
+                    "message": "No se pudo verificar el usuario de GitHub. Por favor, verifica que el nombre de usuario sea correcto.",
+                    "error_type": "validation_error",
+                    "error_code": "INVALID_GITHUB_USER",
+                    "field": "github_username"
+                }
+
             # Verificar que el agente existe y está disponible
             agent_id = investigador_data['agent_id']
             availability = await self.check_agent_availability(agent_id)
@@ -522,13 +581,24 @@ class DatabaseManager:
                 }
 
             try:
-                # Crear investigador
+                # Crear investigador con datos de GitHub
                 investigador_id = str(uuid.uuid4())
                 await self.execute_query("""
-                    INSERT INTO investigadores (id, name, email, phone)
-                    VALUES ($1, $2, $3, $4)
-                """, investigador_id, investigador_data['name'],
-                                         investigador_data['email'], investigador_data.get('phone', ''))
+                    INSERT INTO investigadores (
+                        id, name, email, phone, github_username,
+                        avatar_url, repository_url, linkedin_profile
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                """, 
+                    investigador_id,
+                    investigador_data['name'],
+                    investigador_data['email'],
+                    investigador_data.get('phone', ''),
+                    investigador_data['github_username'],
+                    github_data['avatar_url'],
+                    github_data['repository_url'],
+                    investigador_data.get('linkedin_profile', '')
+                )
             except asyncpg.UniqueViolationError:
                 return {
                     "success": False,
@@ -565,6 +635,10 @@ class DatabaseManager:
                     "name": investigador_data['name'],
                     "email": investigador_data['email'],
                     "phone": investigador_data.get('phone', ''),
+                    "github_username": investigador_data['github_username'],
+                    "avatar_url": github_data['avatar_url'],
+                    "repository_url": github_data['repository_url'],
+                    "linkedin_profile": investigador_data.get('linkedin_profile', ''),
                     "agent_id": agent_id,
                     "status": "assigned"
                 }
@@ -577,4 +651,95 @@ class DatabaseManager:
                 "message": "Ha ocurrido un error inesperado. Por favor, inténtelo más tarde",
                 "error_type": "server_error",
                 "error_code": "INTERNAL_ERROR"
+            }
+
+    async def get_stats(self) -> Dict:
+        """Obtiene estadísticas de agentes e investigadores"""
+        try:
+            stats = await self.execute_query("""
+                WITH stats AS (
+                    SELECT 
+                        (SELECT COUNT(*) FROM ai_agents) as total_agents,
+                        (SELECT COUNT(*) FROM agent_documentation) as documented_agents,
+                        (SELECT COUNT(*) FROM agent_assignments WHERE status = 'active') as active_investigators
+                )
+                SELECT 
+                    total_agents,
+                    documented_agents,
+                    active_investigators
+                FROM stats
+            """)
+
+            if stats:
+                return {
+                    "total_agents": stats[0]['total_agents'],
+                    "documented_agents": stats[0]['documented_agents'],
+                    "active_investigators": stats[0]['active_investigators']
+                }
+            return {
+                "total_agents": 0,
+                "documented_agents": 0,
+                "active_investigators": 0
+            }
+        except Exception as e:
+            logger.error(f"Error obteniendo estadísticas: {str(e)}")
+            raise
+
+    async def complete_agent_documentation(self, documentation_data: Dict) -> Dict:
+        """Registra la documentación completada de un agente"""
+        try:
+            # Verificar que existe la asignación activa
+            assignment = await self.execute_query("""
+                SELECT investigador_id, agent_id 
+                FROM agent_assignments 
+                WHERE agent_id = $1 AND investigador_id = $2 AND status = 'active'
+            """, documentation_data['agent_id'], documentation_data['investigador_id'])
+
+            if not assignment:
+                return {
+                    "success": False,
+                    "message": "No se encontró una asignación activa para este agente e investigador",
+                    "error_type": "validation_error",
+                    "error_code": "NO_ACTIVE_ASSIGNMENT"
+                }
+
+            # Insertar documentación
+            await self.execute_query("""
+                INSERT INTO agent_documentation (
+                    agent_id, investigador_id, findings, recommendations, 
+                    research_summary, research_data
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+            """, 
+                documentation_data['agent_id'],
+                documentation_data['investigador_id'],
+                documentation_data.get('findings', ''),
+                documentation_data.get('recommendations', ''),
+                documentation_data.get('research_summary', ''),
+                json.dumps(documentation_data.get('research_data', {}))
+            )
+
+            # Actualizar estado de la asignación
+            await self.execute_query("""
+                UPDATE agent_assignments 
+                SET status = 'completed' 
+                WHERE agent_id = $1 AND investigador_id = $2
+            """, documentation_data['agent_id'], documentation_data['investigador_id'])
+
+            return {
+                "success": True,
+                "message": "Documentación del agente registrada exitosamente",
+                "data": {
+                    "agent_id": documentation_data['agent_id'],
+                    "investigador_id": documentation_data['investigador_id'],
+                    "status": "completed"
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error registrando documentación: {str(e)}")
+            return {
+                "success": False,
+                "message": "Error al registrar la documentación del agente",
+                "error_type": "server_error",
+                "error_code": "DOCUMENTATION_ERROR"
             }
