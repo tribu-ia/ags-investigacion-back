@@ -5,10 +5,9 @@ import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.Presentation;
 import com.tribu.interview.manager.model.Researcher;
-import com.tribu.interview.manager.repository.AIAgentRepository;
-import com.tribu.interview.manager.repository.AgentAssignmentRepository;
-import com.tribu.interview.manager.repository.PresentationRepository;
-import com.tribu.interview.manager.repository.ResearcherRepository;
+import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
+import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
+import com.tribu.interview.manager.repository.jdbc.JdbcResearcherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,18 +16,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.temporal.WeekFields;
+import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ResearcherService implements IResearcherService {
-    private final ResearcherRepository researcherRepository;
+    private final JdbcResearcherRepository researcherRepository;
     private final GithubService githubService;
-    private final PresentationSchedulerService presentationSchedulerService;
-    private final AgentAssignmentRepository assignmentRepository;
-    private final AIAgentRepository aiAgentRepository;
+    private final PresentationService presentationService;
+    private final JdbcAgentAssignmentRepository assignmentRepository;
+    private final JdbcAIAgentRepository aiAgentRepository;
 
     @Override
     @Transactional
@@ -47,10 +47,9 @@ public class ResearcherService implements IResearcherService {
         AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId());
         log.info("Assignment created for researcher: {} and agent: {}", 
             researcher.getId(), request.getAgentId());
-        
-        // Schedule presentation
-        Presentation presentation = presentationSchedulerService.schedulePresentation(assignment);
-        log.info("Presentation scheduled for: {}", presentation.getPresentationDate());
+
+        Presentation presentation = presentationService.createPresentation(assignment);
+        log.info("Presentation scheduled for week: {}", presentation);
         
         return buildSuccessResponse(researcher, request.getAgentId());
     }
@@ -69,7 +68,7 @@ public class ResearcherService implements IResearcherService {
     }
 
     private void validateAgentExists(String agentId) {
-        if (!aiAgentRepository.existsById(agentId)) {
+        if (aiAgentRepository.findById(agentId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, 
                 "Agent not found");
         }
@@ -89,7 +88,7 @@ public class ResearcherService implements IResearcherService {
     private GithubUserResponse fetchGithubData(String githubUsername) {
         return githubService.fetchUserData(githubUsername)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, 
-                "Could not verify GitHub user"));
+                "No se pudo verificar el usuario de GitHub, por favor verifique que el usuario exista y que tenga acceso a la API de GitHub"));
     }
 
     private Researcher createResearcherEntity(ResearcherRequest request, GithubUserResponse githubData) {
