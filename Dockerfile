@@ -1,13 +1,9 @@
-FROM python:3.12
+FROM amazoncorretto:17-alpine3.18-jdk
 
-WORKDIR /code
+EXPOSE 8082
 
-COPY requirements.txt /requirements.txt
+RUN mkdir -p /app/
 
-ADD ./app /code/app
+COPY target/generador-feedback-0.0.1-SNAPSHOT.jar /app/generador-feedback.jar
 
-RUN pip install -r /requirements.txt
-
-EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["java", "-jar", "/app/generador-feedback.jar"]
