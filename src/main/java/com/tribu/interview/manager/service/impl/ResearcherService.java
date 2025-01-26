@@ -51,7 +51,8 @@ public class ResearcherService implements IResearcherService {
         Presentation presentation = presentationService.createPresentation(assignment);
         log.info("Presentation scheduled for week: {}", presentation);
         
-        return buildSuccessResponse(researcher, request.getAgentId());
+        return buildSuccessResponse(researcher,
+                request.getAgentId(), presentation);
     }
 
     private void validateRequest(ResearcherRequest request) {
@@ -115,7 +116,9 @@ public class ResearcherService implements IResearcherService {
             .build());
     }
 
-    private ResearcherResponse buildSuccessResponse(Researcher researcher, String agentId) {
+    private ResearcherResponse buildSuccessResponse(Researcher researcher,
+                                                    String agentId,
+                                                    Presentation presentation) {
         return ResearcherResponse.builder()
             .success(true)
             .message("Successfully created account and assigned agent")
@@ -131,6 +134,7 @@ public class ResearcherService implements IResearcherService {
                 .agentId(agentId)
                 .status("assigned")
                 .build())
+                .presentationDateTime(presentation.getPresentationDate())
             .build();
     }
 } 

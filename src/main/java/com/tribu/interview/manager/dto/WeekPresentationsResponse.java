@@ -9,5 +9,5 @@ import java.util.List;
 public class WeekPresentationsResponse {
     private String weekStart;
     private String weekEnd;
-    private List<PresentationViewDto> presentations;
+    private List<CalendarPresentationDto> presentations;
 } 
