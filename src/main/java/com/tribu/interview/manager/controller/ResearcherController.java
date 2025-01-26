@@ -2,7 +2,7 @@ package com.tribu.interview.manager.controller;
 
 import com.tribu.interview.manager.dto.ResearcherRequest;
 import com.tribu.interview.manager.dto.ResearcherResponse;
-import com.tribu.interview.manager.service.ResearcherService;
+import com.tribu.interview.manager.service.impl.ResearcherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

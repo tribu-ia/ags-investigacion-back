@@ -1,6 +1,7 @@
-package com.tribu.interview.manager.service;
+package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.GithubUserResponse;
+import com.tribu.interview.manager.service.IGithubService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,12 +16,13 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GithubService {
+public class GithubService implements IGithubService {
     private final RestTemplate restTemplate;
     
     @Value("${github.api.token}")
     private String githubToken;
-    
+
+    @Override
     public Optional<GithubUserResponse> fetchUserData(String username) {
         try {
             HttpHeaders headers = new HttpHeaders();

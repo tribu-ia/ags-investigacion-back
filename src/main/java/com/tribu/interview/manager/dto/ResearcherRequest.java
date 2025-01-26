@@ -1,5 +1,6 @@
 package com.tribu.interview.manager.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -25,11 +26,14 @@ public class ResearcherRequest {
     private String phone;
 
     @NotBlank(message = "GitHub username is required")
+    @JsonProperty("github_username")
     private String githubUsername;
 
     @NotBlank(message = "LinkedIn profile is required")
+    @JsonProperty("linkedin_profile")
     private String linkedinProfile;
 
     @NotBlank(message = "Agent ID is required")
+    @JsonProperty("agent")
     private String agentId;
 } 

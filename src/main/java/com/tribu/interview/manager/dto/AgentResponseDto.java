@@ -1,4 +1,4 @@
-package com.tribu.interview.manager.model;
+package com.tribu.interview.manager.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,13 +10,9 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AIAgent {
+public class AgentResponseDto {
     private String id;
     private String name;
-    private String createdBy;
-    private String website;
-    private String access;
-    private String pricingModel;
     private String category;
     private String industry;
     private String shortDescription;
@@ -25,20 +21,14 @@ public class AIAgent {
     private String useCases;
     private String tags;
     private String logo;
-    private String logoFileName;
     private String image;
-    private String imageFileName;
     private String video;
+    private String website;
+    private String access;
+    private String pricingModel;
+    private String createdBy;
+    private LocalDateTime createdAt;
     private Integer upvotes;
     private Boolean approved;
-    private LocalDateTime createdAt;
-    private String slug;
-    private String version;
     private Boolean featured;
-    
-    // Assignment-related fields from the JOIN
-    private String assignmentStatus;
-    private LocalDateTime assignedAt;
-    private String assignedToName;
-    private String assignedToEmail;
-} 
+}

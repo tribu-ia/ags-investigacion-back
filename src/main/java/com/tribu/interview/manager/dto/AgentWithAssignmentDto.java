@@ -1,4 +1,4 @@
-package com.tribu.interview.manager.model;
+package com.tribu.interview.manager.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AIAgent {
+public class AgentWithAssignmentDto {
     private String id;
     private String name;
     private String createdBy;
@@ -35,10 +35,16 @@ public class AIAgent {
     private String slug;
     private String version;
     private Boolean featured;
-    
-    // Assignment-related fields from the JOIN
-    private String assignmentStatus;
-    private LocalDateTime assignedAt;
-    private String assignedToName;
-    private String assignedToEmail;
+    private Boolean isAssigned;
+    private AssignmentInfoDto assignmentInfo;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssignmentInfoDto {
+        private String assignedTo;
+        private String assignedEmail;
+        private LocalDateTime assignedAt;
+    }
 } 

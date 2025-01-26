@@ -1,8 +1,9 @@
 package com.tribu.interview.manager.dto.enums;
 
 public enum PresentationStatusEnum {
-    SCHEDULED,    // Programada
-    COMPLETED,    // Realizada
-    CANCELLED,    // Cancelada
-    POSTPONED     // Pospuesta
+    PENDING,
+    SCHEDULED,// Initial state
+    VIDEO_UPLOADED,      // Video has been uploaded
+    VOTING_OPEN,        // Presentation is open for voting
+    COMPLETED           // Voting period ended
 }

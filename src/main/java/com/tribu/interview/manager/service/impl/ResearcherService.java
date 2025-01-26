@@ -1,4 +1,4 @@
-package com.tribu.interview.manager.service;
+package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.*;
 import com.tribu.interview.manager.model.AIAgent;
@@ -8,6 +8,8 @@ import com.tribu.interview.manager.model.Researcher;
 import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcResearcherRepository;
+import com.tribu.interview.manager.service.IGithubService;
+import com.tribu.interview.manager.service.IResearcherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -16,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -25,7 +25,7 @@ import java.util.Optional;
 @Slf4j
 public class ResearcherService implements IResearcherService {
     private final JdbcResearcherRepository researcherRepository;
-    private final GithubService githubService;
+    private final IGithubService githubService;
     private final PresentationService presentationService;
     private final JdbcAgentAssignmentRepository assignmentRepository;
     private final JdbcAIAgentRepository aiAgentRepository;

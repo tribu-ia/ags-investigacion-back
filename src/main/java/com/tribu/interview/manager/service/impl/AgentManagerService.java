@@ -1,10 +1,11 @@
-package com.tribu.interview.manager.service;
+package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.*;
 import com.tribu.interview.manager.model.*;
 import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentDocumentationRepository;
+import com.tribu.interview.manager.service.IAgentManagerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -96,42 +97,6 @@ public class AgentManagerService implements IAgentManagerService {
             .featured(agent.getFeatured())
             .isAssigned(isAssigned)
             .assignmentInfo(assignmentInfo)
-            .build();
-    }
-
-    @Override
-    @Transactional
-    public DocumentationResponse completeAgentDocumentation(String agentId, DocumentationRequest request) {
-        AgentAssignment assignment = assignmentRepository.findActiveAssignmentByAgentId(agentId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                "No active assignment found for this agent"));
-
-        AgentDocumentation documentation = AgentDocumentation.builder()
-            .agentId(agentId)
-            .title(request.getTitle())
-            .content(request.getContent())
-            .url(request.getUrl())
-            .type(request.getType())
-            .build();
-
-        documentation = documentationRepository.save(documentation);
-
-        // Update assignment status
-        assignment.setStatus("completed");
-        assignmentRepository.save(assignment);
-
-        return DocumentationResponse.builder()
-            .success(true)
-            .message("Agent documentation successfully registered")
-            .data(DocumentationData.builder()
-                .agentId(agentId)
-                .researcherId(assignment.getResearcher().getId())
-                .status("completed")
-                .title(request.getTitle())
-                .content(request.getContent())
-                .url(request.getUrl())
-                .type(request.getType())
-                .build())
             .build();
     }
 

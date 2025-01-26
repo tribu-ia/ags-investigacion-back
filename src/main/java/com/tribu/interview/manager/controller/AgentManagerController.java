@@ -2,7 +2,7 @@ package com.tribu.interview.manager.controller;
 
 import com.tribu.interview.manager.dto.*;
 import com.tribu.interview.manager.model.AIAgent;
-import com.tribu.interview.manager.service.AgentManagerService;
+import com.tribu.interview.manager.service.impl.AgentManagerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,20 +27,13 @@ public class AgentManagerController {
     }
 
     @GetMapping
-    public ResponseEntity<PaginatedResponse<AIAgent>> getAgents(
+    public ResponseEntity<PaginatedAgentResponse> getAgents(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String industry,
             @RequestParam(required = false) String search) {
         return ResponseEntity.ok(agentManagerService.getAgents(page, pageSize, category, industry, search));
-    }
-
-    @PostMapping("/{agentId}/documentation")
-    public ResponseEntity<DocumentationResponse> documentAgent(
-            @PathVariable String agentId,
-            @Valid @RequestBody DocumentationRequest request) {
-        return ResponseEntity.ok(agentManagerService.completeAgentDocumentation(agentId, request));
     }
 
     @GetMapping("/stats")

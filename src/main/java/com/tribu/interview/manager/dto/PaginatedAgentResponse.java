@@ -5,13 +5,15 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentationRequest {
-    private String title;
-    private String content;
-    private String url;
-    private String type;
+public class PaginatedAgentResponse {
+    private List<AgentWithAssignmentDto> content;
+    private long totalElements;
+    private int totalPages;
+    private int currentPage;
 } 
