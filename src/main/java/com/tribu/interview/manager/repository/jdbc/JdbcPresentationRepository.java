@@ -170,7 +170,6 @@ public class JdbcPresentationRepository {
             INNER JOIN investigadores i ON aa.investigador_id = i.id
             INNER JOIN ai_agents ag ON aa.agent_id = ag.id
             WHERE i.id = :researcherId
-            AND p.presentation_date >= CURRENT_DATE
             ORDER BY p.presentation_date ASC
             LIMIT 1
         """;

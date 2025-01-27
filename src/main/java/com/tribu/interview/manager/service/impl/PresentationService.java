@@ -80,9 +80,9 @@ public class PresentationService implements IPresentationService {
         if (currentDate.getDayOfWeek().getValue() > DayOfWeek.TUESDAY.getValue()) {
             return currentWeekTuesday.plusDays(7).withHour(18).withMinute(0).withSecond(0);
         } else if (currentDate.getDayOfWeek().getValue() == DayOfWeek.TUESDAY.getValue()) {
-            return currentWeekTuesday.plusDays(7).withHour(18).withMinute(0).withSecond(0);
+            return currentWeekTuesday.withHour(18).withMinute(0).withSecond(0);
         } else {
-            return currentWeekTuesday.minusWeeks(1).plusDays(7).withHour(18).withMinute(0).withSecond(0);
+            return currentWeekTuesday.plusDays(7).withHour(18).withMinute(0).withSecond(0);
         }
     }
 
