@@ -33,10 +33,11 @@ import java.util.Collections;
 public class PresentationService implements IPresentationService {
     private final JdbcPresentationRepository presentationRepository;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMMM yyyy");
+    private static final int MAX_PRESENTATIONS_PER_DATE = 5;
 
     @Transactional
     public Presentation createPresentation(AgentAssignment assignment) {
-        LocalDateTime presentationDate = calculateNextPresentationDate();
+        LocalDateTime presentationDate = calculateNextAvailablePresentationDate();
 
         Presentation presentation = Presentation.builder()
             .assignment(assignment)
@@ -68,51 +69,61 @@ public class PresentationService implements IPresentationService {
         
         return WeekPresentationsResponse.builder()
             .weekStart(weekStartTuesday.format(DATE_FORMATTER))
-            .weekEnd(weekStartTuesday.plusDays(7).format(DATE_FORMATTER))
+            .weekEnd(weekStartTuesday.plusDays(6).format(DATE_FORMATTER))
             .presentations(presentations)
             .build();
     }
 
     private LocalDateTime getTargetPresentationDate(LocalDateTime currentDate) {
-
         LocalDateTime currentWeekTuesday = currentDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.TUESDAY));
 
         if (currentDate.getDayOfWeek().getValue() > DayOfWeek.TUESDAY.getValue()) {
             return currentWeekTuesday.plusDays(7).withHour(18).withMinute(0).withSecond(0);
         } else if (currentDate.getDayOfWeek().getValue() == DayOfWeek.TUESDAY.getValue()) {
-            return currentWeekTuesday.minusWeeks(1).plusDays(7).withHour(0).withMinute(0).withSecond(0);
-
+            return currentWeekTuesday.plusDays(7).withHour(18).withMinute(0).withSecond(0);
         } else {
             return currentWeekTuesday.minusWeeks(1).plusDays(7).withHour(18).withMinute(0).withSecond(0);
         }
     }
 
-    private LocalDateTime calculateNextPresentationDate() {
+    private LocalDateTime calculateNextAvailablePresentationDate() {
         LocalDateTime latestDate = presentationRepository.findLatestPresentationDate()
             .orElse(LocalDateTime.of(2025, 1, 21, 18, 0));
-            
-        return getTargetPresentationDate(latestDate.plusDays(1));
+
+        long presentationsCount = countPresentationsForDate(latestDate);
+        
+        if (presentationsCount >= MAX_PRESENTATIONS_PER_DATE) {
+            return getTargetPresentationDate(latestDate.plusDays(1));
+        }
+        
+        return latestDate;
     }
 
-    
+    private long countPresentationsForDate(LocalDateTime date) {
+        LocalDateTime startOfDay = date.withHour(0).withMinute(0).withSecond(0);
+        LocalDateTime endOfDay = date.withHour(23).withMinute(59).withSecond(59);
+        
+        List<CalendarPresentationDto> presentations = presentationRepository.findPresentationsForRange(startOfDay, endOfDay);
+        return presentations.size();
+    }
+
     @Recover
     public WeekPresentationsResponse recover(CannotGetJdbcConnectionException e) {
         log.error("All retries failed for database connection when fetching presentations", e);
-        // Devolver una respuesta vacía pero válida
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime weekStartTuesday = now.with(TemporalAdjusters.previous(DayOfWeek.TUESDAY));
         
         return WeekPresentationsResponse.builder()
             .weekStart(weekStartTuesday.format(DATE_FORMATTER))
-            .weekEnd(weekStartTuesday.plusDays(7).format(DATE_FORMATTER))
+            .weekEnd(weekStartTuesday.plusDays(6).format(DATE_FORMATTER))
             .presentations(Collections.emptyList())
             .build();
     }
 
     @Scheduled(fixedRate = 300000) // 5 minutos
     public void refreshCache() {
+        LocalDateTime now = LocalDateTime.now();
         try {
-            // Llamar al método cacheado para actualizar el caché
             getCurrentWeekPresentations();
             log.debug("Cache refreshed successfully");
         } catch (Exception e) {
