@@ -69,7 +69,7 @@ public class PresentationService implements IPresentationService {
         
         return WeekPresentationsResponse.builder()
             .weekStart(weekStartTuesday.format(DATE_FORMATTER))
-            .weekEnd(weekStartTuesday.plusDays(6).format(DATE_FORMATTER))
+            .weekEnd(weekStartTuesday.plusDays(7).format(DATE_FORMATTER))
             .presentations(presentations)
             .build();
     }

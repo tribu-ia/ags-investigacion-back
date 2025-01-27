@@ -1,6 +1,8 @@
 package com.tribu.interview.manager.repository.jdbc;
 
 import com.tribu.interview.manager.model.AgentAssignment;
+import com.tribu.interview.manager.model.AIAgent;
+import com.tribu.interview.manager.model.Researcher;
 import com.tribu.interview.manager.repository.mapper.AgentAssignmentRowMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -8,6 +10,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.dao.EmptyResultDataAccessException;
 
 import java.util.List;
 import java.util.Optional;
@@ -120,5 +123,65 @@ public class JdbcAgentAssignmentRepository {
             .addValue("status", status);
 
         return jdbcTemplate.queryForObject(sql, params, Long.class);
+    }
+
+    public Optional<AgentAssignment> findActiveAssignmentByResearcherId(String researcherId) {
+        String sql = """
+            SELECT 
+                aa.id,
+                aa.status,
+                aa.assigned_at,
+                i.id as researcher_id,
+                i.name as researcher_name,
+                i.email as researcher_email,
+                i.avatar_url as researcher_avatar_url,
+                i.repository_url as researcher_repository_url,
+                i.linkedin_profile as researcher_linkedin_url,
+                ag.id as agent_id,
+                ag.name as agent_name,
+                ag.short_description as agent_description
+            FROM agent_assignments aa
+            INNER JOIN investigadores i ON aa.investigador_id = i.id
+            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            WHERE i.id = :researcherId
+            AND aa.status = 'active'
+            ORDER BY aa.assigned_at DESC
+            LIMIT 1
+        """;
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("researcherId", researcherId);
+        
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, (rs, rowNum) -> {
+                // Construir el investigador
+                Researcher researcher = Researcher.builder()
+                    .id(rs.getString("researcher_id"))
+                    .name(rs.getString("researcher_name"))
+                    .email(rs.getString("researcher_email"))
+                    .avatarUrl(rs.getString("researcher_avatar_url"))
+                    .repositoryUrl(rs.getString("researcher_repository_url"))
+                    .linkedinProfile(rs.getString("researcher_linkedin_url"))
+                    .build();
+
+                // Construir el agente
+                AIAgent agent = AIAgent.builder()
+                    .id(rs.getString("agent_id"))
+                    .name(rs.getString("agent_name"))
+                    .shortDescription(rs.getString("agent_description"))
+                    .build();
+
+                // Construir la asignación
+                return AgentAssignment.builder()
+                    .id(rs.getString("id"))
+                    .researcher(researcher)
+                    .agent(agent)
+                    .status(rs.getString("status"))
+                    .assignedAt(rs.getTimestamp("assigned_at").toLocalDateTime())
+                    .build();
+            }));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
 } 

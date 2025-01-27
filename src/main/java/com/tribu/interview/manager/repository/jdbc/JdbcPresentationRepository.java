@@ -2,7 +2,10 @@ package com.tribu.interview.manager.repository.jdbc;
 
 import com.tribu.interview.manager.dto.CalendarPresentationDto;
 import com.tribu.interview.manager.dto.enums.PresentationStatusEnum;
+import com.tribu.interview.manager.model.AIAgent;
+import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.Presentation;
+import com.tribu.interview.manager.model.Researcher;
 import com.tribu.interview.manager.repository.mapper.CalendarPresentationMapper;
 import com.tribu.interview.manager.repository.mapper.PresentationRowMapper;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.dao.EmptyResultDataAccessException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -141,6 +145,78 @@ public class JdbcPresentationRepository {
             .addValue("votesCount", presentation.getVotesCount())
             .addValue("isWinner", presentation.getIsWinner())
             .addValue("status", presentation.getStatus());
+    }
+
+    public Optional<Presentation> findCurrentPresentationByResearcherId(String researcherId) {
+        String sql = """
+            SELECT 
+                p.id,
+                p.presentation_date,
+                p.status,
+                p.presentation_week,
+                p.video_url,
+                p.votes_count,
+                p.is_winner,
+                aa.id as assignment_id,
+                i.id as researcher_id,
+                i.name as researcher_name,
+                i.avatar_url as researcher_avatar_url,
+                i.repository_url as researcher_repository_url,
+                i.linkedin_profile as researcher_linkedin_url,
+                ag.id as agent_id,
+                ag.name as agent_name
+            FROM presentations p
+            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
+            INNER JOIN investigadores i ON aa.investigador_id = i.id
+            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            WHERE i.id = :researcherId
+            AND p.presentation_date >= CURRENT_DATE
+            ORDER BY p.presentation_date ASC
+            LIMIT 1
+        """;
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("researcherId", researcherId);
+        
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, (rs, rowNum) -> {
+                // Construir el investigador
+                Researcher researcher = Researcher.builder()
+                    .id(rs.getString("researcher_id"))
+                    .name(rs.getString("researcher_name"))
+                    .avatarUrl(rs.getString("researcher_avatar_url"))
+                    .repositoryUrl(rs.getString("researcher_repository_url"))
+                    .linkedinProfile(rs.getString("researcher_linkedin_url"))
+                    .build();
+
+                // Construir el agente
+                AIAgent agent = AIAgent.builder()
+                    .id(rs.getString("agent_id"))
+                    .name(rs.getString("agent_name"))
+                    .build();
+
+                // Construir la asignación
+                AgentAssignment assignment = AgentAssignment.builder()
+                    .id(rs.getString("assignment_id"))
+                    .researcher(researcher)
+                    .agent(agent)
+                    .build();
+
+                // Construir la presentación
+                return Presentation.builder()
+                    .id(rs.getString("id"))
+                    .assignment(assignment)
+                    .presentationDate(rs.getTimestamp("presentation_date").toLocalDateTime())
+                    .status(rs.getString("status"))
+                    .presentationWeek(rs.getInt("presentation_week"))
+                    .videoUrl(rs.getString("video_url"))
+                    .votesCount(rs.getInt("votes_count"))
+                    .isWinner(rs.getBoolean("is_winner"))
+                    .build();
+            }));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
 
 } 

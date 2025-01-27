@@ -7,6 +7,7 @@ import com.tribu.interview.manager.model.Presentation;
 import com.tribu.interview.manager.model.Researcher;
 import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
+import com.tribu.interview.manager.repository.jdbc.JdbcPresentationRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcResearcherRepository;
 import com.tribu.interview.manager.service.IGithubService;
 import com.tribu.interview.manager.service.IResearcherService;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 @Service
@@ -29,6 +31,9 @@ public class ResearcherService implements IResearcherService {
     private final PresentationService presentationService;
     private final JdbcAgentAssignmentRepository assignmentRepository;
     private final JdbcAIAgentRepository aiAgentRepository;
+    private final JdbcPresentationRepository presentationRepository;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMMM yyyy");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a");
 
     @Override
     @Transactional
@@ -136,5 +141,68 @@ public class ResearcherService implements IResearcherService {
                 .build())
                 .presentationDateTime(presentation.getPresentationDate())
             .build();
+    }
+
+    public ResearcherDetailDto getResearcherDetailsByEmail(String email) {
+        Researcher researcher = researcherRepository.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Investigador no encontrado"));
+
+        Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
+        Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
+
+        return buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
+    }
+
+    @Transactional
+    public ResearcherDetailDto updateResearcherProfile(String email, ResearcherUpdateDto updateDto) {
+        Researcher researcher = researcherRepository.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Investigador no encontrado"));
+
+        // Si el username de GitHub cambió, actualizar la información desde GitHub
+        if (!researcher.getGithubUsername().equals(updateDto.getGithubUsername())) {
+            GithubUserResponse githubInfo = githubService.fetchUserData(updateDto.getGithubUsername())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                    "No se pudo verificar el usuario de GitHub"));
+            
+            researcher.setAvatarUrl(githubInfo.getAvatarUrl());
+            researcher.setRepositoryUrl(githubInfo.getHtmlUrl());
+            researcher.setGithubUsername(updateDto.getGithubUsername());
+        }
+
+        researcher.setCurrentRole(updateDto.getCurrentRole());
+        researcher.setLinkedinProfile(updateDto.getLinkedinProfile());
+
+        researcher = researcherRepository.save(researcher);
+        Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
+        Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
+
+        return buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
+    }
+
+    private ResearcherDetailDto buildResearcherDetailDto(Researcher researcher,
+                                                         Presentation presentation,
+                                                         AgentAssignment assignment) {
+        ResearcherDetailDto.ResearcherDetailDtoBuilder builder = ResearcherDetailDto.builder()
+            .name(researcher.getName())
+            .email(researcher.getEmail())
+            .avatarUrl(researcher.getAvatarUrl())
+            .repositoryUrl(researcher.getRepositoryUrl())
+            .linkedinProfile(researcher.getLinkedinProfile())
+            .currentRole(researcher.getCurrentRole())
+            .githubUsername(researcher.getGithubUsername());
+
+        if (presentation != null) {
+            builder
+                .presentationDate(presentation.getPresentationDate().format(DATE_FORMATTER))
+                .presentationTime(presentation.getPresentationDate().format(TIME_FORMATTER))
+                .status(presentation.getStatus())
+                .presentationWeek(String.valueOf(presentation.getPresentationWeek()));
+        }
+
+        if (assignment != null) {
+            builder.agentName(assignment.getAgent().getName());
+        }
+
+        return builder.build();
     }
 } 

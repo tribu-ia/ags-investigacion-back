@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.dao.EmptyResultDataAccessException;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,13 +36,41 @@ public class JdbcResearcherRepository {
     }
 
     public Optional<Researcher> findByEmail(String email) {
-        String sql = SELECT_BASE + " WHERE email = :email";
-        
+        String sql = """
+            SELECT 
+                id,
+                name,
+                email,
+                phone,
+                github_username,
+                avatar_url,
+                repository_url,
+                linkedin_profile,
+                current_rol
+            FROM investigadores
+            WHERE email = :email
+        """;
+
         MapSqlParameterSource params = new MapSqlParameterSource()
             .addValue("email", email);
 
-        List<Researcher> results = jdbcTemplate.query(sql, params, rowMapper);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, (rs, rowNum) ->
+                Researcher.builder()
+                    .id(rs.getString("id"))
+                    .name(rs.getString("name"))
+                    .email(rs.getString("email"))
+                    .phone(rs.getString("phone"))
+                    .githubUsername(rs.getString("github_username"))
+                    .avatarUrl(rs.getString("avatar_url"))
+                    .repositoryUrl(rs.getString("repository_url"))
+                    .linkedinProfile(rs.getString("linkedin_profile"))
+                    .currentRole(rs.getString("current_rol"))
+                    .build()
+            ));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
 
     public List<Researcher> findAll() {
@@ -57,10 +86,13 @@ public class JdbcResearcherRepository {
 
     private Researcher insert(Researcher researcher) {
         String sql = """
-            INSERT INTO investigadores (id, name, email, phone, github_username,
-                                     avatar_url, repository_url, linkedin_profile, created_at)
-            VALUES (:id, :name, :email, :phone, :githubUsername,
-                   :avatarUrl, :repositoryUrl, :linkedinProfile, :createdAt)
+            INSERT INTO investigadores (
+                id, name, email, phone, github_username, 
+                avatar_url, repository_url, linkedin_profile, current_rol
+            ) VALUES (
+                :id, :name, :email, :phone, :githubUsername,
+                :avatarUrl, :repositoryUrl, :linkedinProfile, :currentRole
+            )
         """;
 
         String id = UUID.randomUUID().toString();
@@ -82,7 +114,7 @@ public class JdbcResearcherRepository {
                 avatar_url = :avatarUrl,
                 repository_url = :repositoryUrl,
                 linkedin_profile = :linkedinProfile,
-                created_at = :createdAt
+                current_rol = :currentRole
             WHERE id = :id
         """;
 
@@ -102,7 +134,7 @@ public class JdbcResearcherRepository {
             .addValue("avatarUrl", researcher.getAvatarUrl())
             .addValue("repositoryUrl", researcher.getRepositoryUrl())
             .addValue("linkedinProfile", researcher.getLinkedinProfile())
-            .addValue("createdAt", researcher.getCreatedAt());
+            .addValue("currentRole", researcher.getCurrentRole());
     }
 
     public boolean existsByEmail(String email) {

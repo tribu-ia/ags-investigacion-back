@@ -4,6 +4,6 @@ EXPOSE 8082
 
 RUN mkdir -p /app/
 
-COPY target/generador-feedback-0.0.1-SNAPSHOT.jar /app/generador-feedback.jar
+COPY target/manager-0.0.1-SNAPSHOT.jar /app/manager.jar
 
-ENTRYPOINT ["java", "-jar", "/app/generador-feedback.jar"]
+ENTRYPOINT ["java", "-jar", "/app/manager.jar"]

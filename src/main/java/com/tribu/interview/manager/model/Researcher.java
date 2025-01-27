@@ -1,15 +1,14 @@
 package com.tribu.interview.manager.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Setter
 public class Researcher {
     private String id;
     private String name;
@@ -20,4 +19,5 @@ public class Researcher {
     private String repositoryUrl;
     private String linkedinProfile;
     private LocalDateTime createdAt;
+    private String currentRole;
 } 
