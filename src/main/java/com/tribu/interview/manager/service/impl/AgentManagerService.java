@@ -4,15 +4,12 @@ import com.tribu.interview.manager.dto.*;
 import com.tribu.interview.manager.model.*;
 import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
-import com.tribu.interview.manager.repository.jdbc.JdbcAgentDocumentationRepository;
 import com.tribu.interview.manager.service.IAgentManagerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -23,7 +20,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AgentManagerService implements IAgentManagerService {
     private final JdbcAIAgentRepository aiAgentRepository;
-    private final JdbcAgentDocumentationRepository documentationRepository;
     private final JdbcAgentAssignmentRepository assignmentRepository;
     
     @Override
@@ -141,7 +137,7 @@ public class AgentManagerService implements IAgentManagerService {
     public StatsDto getStats() {
         return StatsDto.builder()
                 .active_investigators(assignmentRepository.countByStatus("active"))
-                .documented_agents(documentationRepository.countDocumentedAgents())
+                .documented_agents(20L)
                 .total_agents(aiAgentRepository.count())
                 .build();
     }

@@ -5,17 +5,16 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.Map;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentationRequest {
+public class FinalizeDocumentationRequest {
     @NotNull
     private String assignmentId;
-    private String markdownContent;
-    private String recommendations;
-    private String researchSummary;
-    private Map<String, Object> additionalData;
+    private List<MultipartFile> documents;
 } 

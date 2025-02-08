@@ -1,4 +1,10 @@
 spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+      file-size-threshold: 2KB
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USER:postgres}
@@ -32,6 +38,10 @@ server:
     include-binding-errors: always
   servlet:
     context-path: "/api/researchers-managements"
+  tomcat:
+    max-http-form-post-size: 50MB
+    max-swallow-size: 50MB
+
 logging:
   level:
     com.tribu.interview: DEBUG

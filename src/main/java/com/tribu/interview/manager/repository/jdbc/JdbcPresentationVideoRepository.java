@@ -184,9 +184,10 @@ public class JdbcPresentationVideoRepository {
                 a.name as agent_name
             FROM presentation_videos pv
             JOIN agent_assignments aa ON pv.assignment_id = aa.id
+            JOIN presentations p ON p.assignment_id = aa.id
             JOIN investigadores i ON aa.investigador_id = i.id
             JOIN ai_agents a ON aa.agent_id = a.id
-            WHERE pv.show_order = :currentMonth
+            WHERE p.show_order = :currentMonth
             ORDER BY pv.uploaded_at DESC
         """;
         

@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Data
 @Builder
@@ -11,9 +13,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AgentDocumentation {
     private String id;
-    private String agentId;
-    private String title;
-    private String content;
-    private String url;
-    private String type;
-} 
+    private String assignmentId;
+    private String markdownContent;
+    private LocalDateTime documentationDate;
+    private String status; // DRAFT, COMPLETED
+}
