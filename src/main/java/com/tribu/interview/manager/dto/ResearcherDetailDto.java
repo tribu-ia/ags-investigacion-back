@@ -17,7 +17,15 @@ public class ResearcherDetailDto {
     // Presentation info
     private String presentationDate;
     private String presentationTime;
-    private String agentName;
     private String status;
     private String presentationWeek;
+
+    // Agent info
+    private String agentName;
+    private String agentDescription;
+    private String agentCategory;
+    private String agentIndustry;
+
+    // Assignment
+    private String assignmentId;
 } 

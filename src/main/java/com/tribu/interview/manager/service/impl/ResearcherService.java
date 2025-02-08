@@ -201,6 +201,10 @@ public class ResearcherService implements IResearcherService {
 
         if (assignment != null) {
             builder.agentName(assignment.getAgent().getName());
+            builder.agentDescription(assignment.getAgent().getShortDescription());
+            builder.agentCategory(assignment.getAgent().getCategory());
+            builder.agentIndustry(assignment.getAgent().getIndustry());
+            builder.assignmentId(assignment.getId());
         }
 
         return builder.build();

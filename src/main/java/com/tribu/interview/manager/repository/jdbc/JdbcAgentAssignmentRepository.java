@@ -138,7 +138,9 @@ public class JdbcAgentAssignmentRepository {
                 i.repository_url as researcher_repository_url,
                 i.linkedin_profile as researcher_linkedin_url,
                 ag.id as agent_id,
-                ag.name as agent_name,
+                ag.name as agent_name,            
+                ag.industry as agent_industry,
+                ag.category as agent_category,       
                 ag.short_description as agent_description
             FROM agent_assignments aa
             INNER JOIN investigadores i ON aa.investigador_id = i.id
@@ -168,6 +170,8 @@ public class JdbcAgentAssignmentRepository {
                 AIAgent agent = AIAgent.builder()
                     .id(rs.getString("agent_id"))
                     .name(rs.getString("agent_name"))
+                        .industry(rs.getString("agent_industry"))
+                        .category(rs.getString("agent_category"))
                     .shortDescription(rs.getString("agent_description"))
                     .build();
 
