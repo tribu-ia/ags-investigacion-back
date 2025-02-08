@@ -16,4 +16,5 @@ public class ResearcherData {
     private String linkedinProfile;
     private String agentId;
     private String status;
+    private String role;
 }

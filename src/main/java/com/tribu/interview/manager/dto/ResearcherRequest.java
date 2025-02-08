@@ -36,4 +36,7 @@ public class ResearcherRequest {
     @NotBlank(message = "Agent ID is required")
     @JsonProperty("agent")
     private String agentId;
+
+    @JsonProperty("role")
+    private String role = "CONTRIBUTOR";
 } 

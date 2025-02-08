@@ -1,6 +1,7 @@
 package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.*;
+import com.tribu.interview.manager.dto.enums.ResearcherTypeEnum;
 import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.Presentation;
@@ -40,10 +41,11 @@ public class ResearcherService implements IResearcherService {
     @Transactional
     public ResearcherResponse createResearcher(ResearcherRequest request) {
         log.info("Creating new researcher with email: {}", request.getEmail());
-        
+
+
         validateRequest(request);
         GithubUserResponse githubData = fetchGithubData(request.getGithubUsername());
-        
+
         // Create researcher
         Researcher researcher = createResearcherEntity(request, githubData);
         researcher = researcherRepository.save(researcher);
@@ -51,14 +53,18 @@ public class ResearcherService implements IResearcherService {
 
         // Create assignment and schedule presentation
         AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId());
-        log.info("Assignment created for researcher: {} and agent: {}", 
+        log.info("Assignment created for researcher: {} and agent: {}",
             researcher.getId(), request.getAgentId());
 
-        Presentation presentation = presentationService.createPresentation(assignment);
-        log.info("Presentation scheduled for week: {}", presentation);
+
+        Presentation presentation = null;
+        if (request.getRole().equals(ResearcherTypeEnum.PRIMARY.name())){
+            presentation = presentationService.createPresentation(assignment);
+            log.info("Presentation scheduled for week: {}", presentation);
+        }
         
         return buildSuccessResponse(researcher,
-                request.getAgentId(), presentation);
+                request.getAgentId(), Objects.requireNonNull(presentation));
     }
 
     private void validateRequest(ResearcherRequest request) {
@@ -107,6 +113,8 @@ public class ResearcherService implements IResearcherService {
             .avatarUrl(githubData.getAvatarUrl())
             .repositoryUrl(githubData.getHtmlUrl())
             .linkedinProfile(request.getLinkedinProfile())
+            .currentRole(request.getRole())
+            .createdAt(LocalDateTime.now())
             .build();
     }
 
@@ -139,8 +147,9 @@ public class ResearcherService implements IResearcherService {
                 .linkedinProfile(researcher.getLinkedinProfile())
                 .agentId(agentId)
                 .status("assigned")
+                .role(researcher.getCurrentRole())
                 .build())
-                .presentationDateTime(presentation.getPresentationDate())
+            .presentationDateTime(presentation.getPresentationDate())
             .build();
     }
 
