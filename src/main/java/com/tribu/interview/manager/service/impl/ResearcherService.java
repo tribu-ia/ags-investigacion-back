@@ -198,20 +198,17 @@ public class ResearcherService implements IResearcherService {
                 .presentationTime(presentation.getPresentationDate().format(TIME_FORMATTER))
                 .status(presentation.getStatus())
                 .presentationWeek(String.valueOf(presentation.getPresentationWeek()));
+            builder.showOrder(presentation.getShowOrder());
         }
 
         if (assignment != null) {
-            int showOrder = 0;
-            if(presentation != null && presentation.getPresentationVideo() != null){
-                showOrder = presentation.getPresentationVideo().getShowOrder();
-            }
 
             builder.agentName(assignment.getAgent().getName());
             builder.agentDescription(assignment.getAgent().getShortDescription());
             builder.agentCategory(assignment.getAgent().getCategory());
             builder.agentIndustry(assignment.getAgent().getIndustry());
             builder.assignmentId(assignment.getId());
-            builder.showOrder(showOrder);
+
         }
 
         return builder.build();

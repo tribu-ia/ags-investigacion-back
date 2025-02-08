@@ -21,5 +21,6 @@ public class Presentation {
     private Boolean isWinner;
     private String status;
     private PresentationVideo presentationVideo;
+    private Integer showOrder;
 }
 
