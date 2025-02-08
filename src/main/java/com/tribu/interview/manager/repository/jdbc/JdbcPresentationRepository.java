@@ -2,10 +2,7 @@ package com.tribu.interview.manager.repository.jdbc;
 
 import com.tribu.interview.manager.dto.CalendarPresentationDto;
 import com.tribu.interview.manager.dto.enums.PresentationStatusEnum;
-import com.tribu.interview.manager.model.AIAgent;
-import com.tribu.interview.manager.model.AgentAssignment;
-import com.tribu.interview.manager.model.Presentation;
-import com.tribu.interview.manager.model.Researcher;
+import com.tribu.interview.manager.model.*;
 import com.tribu.interview.manager.repository.mapper.CalendarPresentationMapper;
 import com.tribu.interview.manager.repository.mapper.PresentationRowMapper;
 import lombok.RequiredArgsConstructor;
@@ -164,11 +161,13 @@ public class JdbcPresentationRepository {
                 i.repository_url as researcher_repository_url,
                 i.linkedin_profile as researcher_linkedin_url,
                 ag.id as agent_id,
-                ag.name as agent_name
+                ag.name as agent_name,
+                pv.show_order
             FROM presentations p
             INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
             INNER JOIN investigadores i ON aa.investigador_id = i.id
             INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            INNER JOIN presentation_videos pv ON aa.id = pv.assignment_id
             WHERE i.id = :researcherId
             ORDER BY p.presentation_date ASC
             LIMIT 1
@@ -200,6 +199,9 @@ public class JdbcPresentationRepository {
                     .researcher(researcher)
                     .agent(agent)
                     .build();
+                PresentationVideo presentationVideo = PresentationVideo.builder()
+                        .showOrder(rs.getInt("show_order"))
+                        .build();
 
                 // Construir la presentación
                 return Presentation.builder()
@@ -211,6 +213,7 @@ public class JdbcPresentationRepository {
                     .videoUrl(rs.getString("video_url"))
                     .votesCount(rs.getInt("votes_count"))
                     .isWinner(rs.getBoolean("is_winner"))
+                        .presentationVideo(presentationVideo)
                     .build();
             }));
         } catch (EmptyResultDataAccessException e) {

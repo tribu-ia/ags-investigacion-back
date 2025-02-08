@@ -8,6 +8,7 @@ import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository
 import com.tribu.interview.manager.repository.jdbc.JdbcConfigParamsRepository;
 import com.tribu.interview.manager.dto.UploadVideoRequest;
 import com.tribu.interview.manager.dto.PresentationVideoResponse;
+import com.tribu.interview.manager.dto.ChallengeStatusResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,8 +25,15 @@ public class PresentationVideoService {
     private final JdbcPresentationVideoRepository videoRepository;
     private final JdbcAgentAssignmentRepository assignmentRepository;
     private final JdbcConfigParamsRepository configParamsRepository;
+    private final ConfigParamsService configParamsService;
     
     public PresentationVideoResponse uploadVideo(UploadVideoRequest request) {
+        ChallengeStatusResponse status = configParamsService.getChallengeStatus();
+        
+        if (!status.getIsWeekOfUpload()) {
+            throw new IllegalStateException("Videos can only be uploaded during the upload week");
+        }
+        
         // Validar que la asignación existe y está activa
         AgentAssignment assignment = assignmentRepository.findById(request.getAssignmentId())
             .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
@@ -57,13 +65,13 @@ public class PresentationVideoService {
     
     private void validateAssignmentEligibility(AgentAssignment assignment) {
         // Obtener el mes actual del challenge desde la configuración
-        int currentChallengeMonth = configParamsRepository.getCurrentMonthForChallenge();
+        ChallengeStatusResponse currentChallengeMonth = configParamsRepository.getChallengeStatus();
         
         // Obtener el mes de la asignación
         int assignmentMonth = assignment.getAssignedAt().getMonthValue();
         
         // Validar que la asignación corresponde al mes actual del challenge
-        if (assignmentMonth != currentChallengeMonth) {
+        if (assignmentMonth != currentChallengeMonth.getCurrentMonth()) {
             throw new IllegalStateException(
                 "Videos can only be uploaded for assignments from the current challenge month (" + 
                 currentChallengeMonth + ")"
@@ -129,19 +137,22 @@ public class PresentationVideoService {
     }
 
     public List<PresentationVideoResponse> getVideosInVotingPeriod() {
-        // Obtener el mes actual del challenge desde la configuración
-        int currentChallengeMonth = configParamsRepository.getCurrentMonthForChallenge();
+        ChallengeStatusResponse status = configParamsService.getChallengeStatus();
         
-        return videoRepository.findAllInVotingPeriod(currentChallengeMonth)
+        if (!status.getIsWeekOfVoting()) {
+            throw new IllegalStateException("Voting period is not active");
+        }
+        
+        return videoRepository.findAllInVotingPeriod(status.getCurrentMonth())
             .stream()
             .map(this::mapToVideoResponse)
             .collect(Collectors.toList());
     }
 
     public List<PresentationVideoResponse> getCurrentMonthVideos() {
-        int currentChallengeMonth = configParamsRepository.getCurrentMonthForChallenge();
+        ChallengeStatusResponse currentChallengeMonth = configParamsRepository.getChallengeStatus();
         
-        return videoRepository.findAllByMonth(currentChallengeMonth)
+        return videoRepository.findAllByMonth(currentChallengeMonth.getCurrentMonth())
             .stream()
             .map(this::mapToVideoResponse)
             .collect(Collectors.toList());

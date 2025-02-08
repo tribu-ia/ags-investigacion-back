@@ -20,5 +20,6 @@ public class Presentation {
     private Integer votesCount;
     private Boolean isWinner;
     private String status;
+    private PresentationVideo presentationVideo;
 }
 

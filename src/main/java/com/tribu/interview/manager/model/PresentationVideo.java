@@ -23,4 +23,5 @@ public class PresentationVideo {
     private LocalDateTime votingEndDate;
     private Integer votesCount;
     private String status;
+    private Integer showOrder;
 } 

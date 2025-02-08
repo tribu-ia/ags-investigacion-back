@@ -28,4 +28,8 @@ public class ResearcherDetailDto {
 
     // Assignment
     private String assignmentId;
+
+    // PresentationVideo
+    private Integer showOrder;
+
 } 

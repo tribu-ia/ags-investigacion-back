@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -200,11 +201,17 @@ public class ResearcherService implements IResearcherService {
         }
 
         if (assignment != null) {
+            int showOrder = 0;
+            if(presentation != null && presentation.getPresentationVideo() != null){
+                showOrder = presentation.getPresentationVideo().getShowOrder();
+            }
+
             builder.agentName(assignment.getAgent().getName());
             builder.agentDescription(assignment.getAgent().getShortDescription());
             builder.agentCategory(assignment.getAgent().getCategory());
             builder.agentIndustry(assignment.getAgent().getIndustry());
             builder.assignmentId(assignment.getId());
+            builder.showOrder(showOrder);
         }
 
         return builder.build();
