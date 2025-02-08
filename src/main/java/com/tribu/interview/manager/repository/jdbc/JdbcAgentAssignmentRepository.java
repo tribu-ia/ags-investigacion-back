@@ -31,6 +31,7 @@ public class JdbcAgentAssignmentRepository {
             i.email as researcher_email,
             aa.agent_id as agent_id,
             a.name as agent_name,
+            a.slug as agent_slug,
             aa.status as status,
             aa.assigned_at as assigned_at
         FROM agent_assignments aa

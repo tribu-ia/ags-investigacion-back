@@ -1,16 +1,17 @@
 package com.tribu.interview.manager.service.impl;
 
+import com.tribu.interview.manager.model.AIAgent;
+import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.AgentDocumentation;
 import com.tribu.interview.manager.dto.SaveMarkdownRequest;
 import com.tribu.interview.manager.dto.FinalizeDocumentationRequest;
+import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentDocumentationRepository;
-import com.tribu.interview.manager.service.IGithubService;
+import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
-import java.util.List;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Slf4j
@@ -18,7 +19,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class AgentDocumentationService {
     
     private final JdbcAgentDocumentationRepository documentationRepository;
-    private final IGithubService githubService;
+    private final JdbcAgentAssignmentRepository assignmentRepository;
+    private final JdbcAIAgentRepository agentRepository;
+    private final GithubService githubService;
     
     public AgentDocumentation saveMarkdown(SaveMarkdownRequest request) {
         AgentDocumentation documentation = documentationRepository
@@ -40,22 +43,30 @@ public class AgentDocumentationService {
             .findByAssignmentId(request.getAssignmentId())
             .orElseThrow(() -> new ResourceNotFoundException("Documentation not found"));
             
-        // TODO: Implementar la carga a GitHub
-        // Por ahora solo mockearemos la funcionalidad
-        String githubUrl = mockGithubUpload(documentation, request.getDocuments());
+        // Obtener la asignación y el agente
+        AgentAssignment assignment = assignmentRepository
+            .findById(request.getAssignmentId())
+            .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
+
+        // Crear estructura de carpetas usando el slug del agente
+        String folderPath = assignment.getAgent().getSlug();
+        String documentName = "documentacion.md"; // o podría ser {agentSlug}.md
         
-        // Actualizar estado
+        // Subir documentación a GitHub
+        String githubUrl = githubService.uploadDocumentation(
+            folderPath,
+            documentName,
+            documentation.getMarkdownContent(),
+            request.getDocuments()
+        );
+        
+        // Actualizar estado y guardar
         documentation.setStatus("COMPLETED");
+        AgentDocumentation savedDoc = documentationRepository.save(documentation);
         
-        return documentationRepository.save(documentation);
-    }
-    
-    private String mockGithubUpload(AgentDocumentation documentation, List<MultipartFile> documents) {
-        // Mock de la funcionalidad de GitHub
-        // Aquí iría la lógica real usando githubService
-        log.info("Mock: Subiendo {} documentos a GitHub para la documentación {}", 
-            documents.size(), documentation.getId());
-        return "https://github.com/org/repo/docs/" + documentation.getId();
+        log.info("Documentation finalized and uploaded to GitHub: {}", githubUrl);
+        
+        return savedDoc;
     }
     
     public AgentDocumentation getDocumentation(String assignmentId) {

@@ -51,5 +51,8 @@ logging:
 github:
   api:
     token: ${GITHUB_TOKEN}
+  repository:
+    owner: "tribu-ia"
+    name: "documentacion-investigacion-agentes-ia"
 
 
