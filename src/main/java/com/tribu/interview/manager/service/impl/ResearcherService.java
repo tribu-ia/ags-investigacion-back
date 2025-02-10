@@ -113,7 +113,7 @@ public class ResearcherService implements IResearcherService {
             .avatarUrl(githubData.getAvatarUrl())
             .repositoryUrl(githubData.getHtmlUrl())
             .linkedinProfile(request.getLinkedinProfile())
-            .currentRole(request.getRole())
+            .role(request.getRole())
             .createdAt(LocalDateTime.now())
             .build();
     }
@@ -147,9 +147,9 @@ public class ResearcherService implements IResearcherService {
                 .linkedinProfile(researcher.getLinkedinProfile())
                 .agentId(agentId)
                 .status("assigned")
-                .role(researcher.getCurrentRole())
+                .role(researcher.getRole())
                 .build())
-            .presentationDateTime(presentation.getPresentationDate())
+            .presentationDateTime(presentation != null ? presentation.getPresentationDate() : null)
             .build();
     }
 
@@ -179,7 +179,7 @@ public class ResearcherService implements IResearcherService {
             researcher.setGithubUsername(updateDto.getGithubUsername());
         }
 
-        researcher.setCurrentRole(updateDto.getCurrentRole());
+        researcher.setRole(updateDto.getCurrentRole());
         researcher.setLinkedinProfile(updateDto.getLinkedinProfile());
 
         researcher = researcherRepository.save(researcher);
@@ -198,7 +198,7 @@ public class ResearcherService implements IResearcherService {
             .avatarUrl(researcher.getAvatarUrl())
             .repositoryUrl(researcher.getRepositoryUrl())
             .linkedinProfile(researcher.getLinkedinProfile())
-            .currentRole(researcher.getCurrentRole())
+            .role(researcher.getRole())
             .githubUsername(researcher.getGithubUsername());
 
         if (presentation != null) {

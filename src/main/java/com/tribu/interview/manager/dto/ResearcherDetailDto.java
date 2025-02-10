@@ -11,7 +11,7 @@ public class ResearcherDetailDto {
     private String avatarUrl;
     private String repositoryUrl;
     private String linkedinProfile;
-    private String currentRole;
+    private String role;
     private String githubUsername;
     
     // Presentation info

@@ -1,4 +1,4 @@
-FROM amazoncorretto:17-alpine3.18-jdk
+FROM amazoncorretto:17-alpine3.19-jdk
 
 ARG TZ='America/Bogota'
 ENV TZ=${TZ}

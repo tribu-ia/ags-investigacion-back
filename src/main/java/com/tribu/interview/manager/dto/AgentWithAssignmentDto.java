@@ -35,8 +35,9 @@ public class AgentWithAssignmentDto {
     private String slug;
     private String version;
     private Boolean featured;
-    private Boolean isAssigned;
+    private Boolean hasPrimaryResearcher;
     private AssignmentInfoDto assignmentInfo;
+    private Integer totalContributors;
 
     @Data
     @Builder
@@ -46,5 +47,6 @@ public class AgentWithAssignmentDto {
         private String assignedTo;
         private String assignedEmail;
         private LocalDateTime assignedAt;
+        private String assignedRole;
     }
 } 

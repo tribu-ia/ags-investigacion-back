@@ -41,4 +41,6 @@ public class AIAgent {
     private LocalDateTime assignedAt;
     private String assignedToName;
     private String assignedToEmail;
+    private String assignedRole;
+    private Integer totalContributors;
 } 

@@ -31,9 +31,19 @@ public class JdbcAIAgentRepository {
                aa.status as assignment_status,
                aa.assigned_at,
                r.name as assigned_to_name,
-               r.email as assigned_to_email
+               r.email as assigned_to_email,
+               r.role as assigned_role,
+               (SELECT COUNT(*) FROM agent_assignments aa2 
+                WHERE aa2.agent_id = a.id 
+                AND aa2.status = 'active') as total_contributors
         FROM ai_agents a
-        LEFT JOIN agent_assignments aa ON a.id = aa.agent_id AND aa.status = 'active'
+        LEFT JOIN agent_assignments aa ON a.id = aa.agent_id 
+            AND aa.status = 'active' 
+            AND EXISTS (
+                SELECT 1 FROM investigadores i 
+                WHERE i.id = aa.investigador_id 
+                AND i.role = 'PRIMARY'
+            )
         LEFT JOIN investigadores r ON aa.investigador_id = r.id
     """;
 

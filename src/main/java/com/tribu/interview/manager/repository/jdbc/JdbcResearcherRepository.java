@@ -21,8 +21,31 @@ public class JdbcResearcherRepository {
 
     private static final String SELECT_BASE = """
         SELECT id, name, email, phone, github_username, avatar_url, 
-               repository_url, linkedin_profile, created_at
+               repository_url, linkedin_profile, role
         FROM investigadores
+    """;
+
+    private static final String INSERT_SQL = """
+        INSERT INTO investigadores (
+            id, name, email, phone, github_username, 
+            avatar_url, repository_url, linkedin_profile, role
+        ) VALUES (
+            :id, :name, :email, :phone, :githubUsername,
+            :avatarUrl, :repositoryUrl, :linkedinProfile, :role
+        )
+    """;
+
+    private static final String UPDATE_SQL = """
+        UPDATE investigadores 
+        SET name = :name,
+            email = :email,
+            phone = :phone,
+            github_username = :githubUsername,
+            avatar_url = :avatarUrl,
+            repository_url = :repositoryUrl,
+            linkedin_profile = :linkedinProfile,
+            role = :role
+        WHERE id = :id
     """;
 
     public Optional<Researcher> findById(String id) {
@@ -65,7 +88,7 @@ public class JdbcResearcherRepository {
                     .avatarUrl(rs.getString("avatar_url"))
                     .repositoryUrl(rs.getString("repository_url"))
                     .linkedinProfile(rs.getString("linkedin_profile"))
-                    .currentRole(rs.getString("current_rol"))
+                    .role(rs.getString("current_rol"))
                     .build()
             ));
         } catch (EmptyResultDataAccessException e) {
@@ -85,15 +108,7 @@ public class JdbcResearcherRepository {
     }
 
     private Researcher insert(Researcher researcher) {
-        String sql = """
-            INSERT INTO investigadores (
-                id, name, email, phone, github_username, 
-                avatar_url, repository_url, linkedin_profile, current_rol
-            ) VALUES (
-                :id, :name, :email, :phone, :githubUsername,
-                :avatarUrl, :repositoryUrl, :linkedinProfile, :currentRole
-            )
-        """;
+        String sql = INSERT_SQL;
 
         String id = UUID.randomUUID().toString();
         MapSqlParameterSource params = createParameterSource(researcher)
@@ -105,18 +120,7 @@ public class JdbcResearcherRepository {
     }
 
     private Researcher update(Researcher researcher) {
-        String sql = """
-            UPDATE investigadores 
-            SET name = :name,
-                email = :email,
-                phone = :phone,
-                github_username = :githubUsername,
-                avatar_url = :avatarUrl,
-                repository_url = :repositoryUrl,
-                linkedin_profile = :linkedinProfile,
-                current_rol = :currentRole
-            WHERE id = :id
-        """;
+        String sql = UPDATE_SQL;
 
         MapSqlParameterSource params = createParameterSource(researcher)
             .addValue("id", researcher.getId());
@@ -134,7 +138,7 @@ public class JdbcResearcherRepository {
             .addValue("avatarUrl", researcher.getAvatarUrl())
             .addValue("repositoryUrl", researcher.getRepositoryUrl())
             .addValue("linkedinProfile", researcher.getLinkedinProfile())
-            .addValue("currentRole", researcher.getCurrentRole());
+            .addValue("role", researcher.getRole());
     }
 
     public boolean existsByEmail(String email) {

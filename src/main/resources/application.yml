@@ -18,18 +18,6 @@ spring:
       pool-name: HikariCorePool
       max-lifetime: 1800000
       connection-timeout: 30000
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: false
-    show-sql: false
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=100,expireAfterWrite=5m
 
 server:
   port: ${PORT:8080}

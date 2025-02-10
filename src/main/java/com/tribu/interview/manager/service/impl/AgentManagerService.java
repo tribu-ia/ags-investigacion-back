@@ -57,13 +57,18 @@ public class AgentManagerService implements IAgentManagerService {
     }
 
     private AgentWithAssignmentDto mapToAgentWithAssignmentDto(AIAgent agent) {
-        boolean isAssigned = agent.getAssignmentStatus() != null && agent.getAssignmentStatus().equals("active");
+        // Un agente está asignado si tiene un investigador primario activo
+        boolean hasPrimaryResearcher = agent.getAssignmentStatus() != null && 
+                                     agent.getAssignmentStatus().equals("active") && 
+                                     agent.getAssignedRole() != null && 
+                                     agent.getAssignedRole().equals("PRIMARY");
         
-        AgentWithAssignmentDto.AssignmentInfoDto assignmentInfo = isAssigned ? 
+        AgentWithAssignmentDto.AssignmentInfoDto assignmentInfo = hasPrimaryResearcher ? 
             AgentWithAssignmentDto.AssignmentInfoDto.builder()
                 .assignedTo(agent.getAssignedToName())
                 .assignedEmail(agent.getAssignedToEmail())
                 .assignedAt(agent.getAssignedAt())
+                .assignedRole(agent.getAssignedRole())
                 .build() : null;
 
         return AgentWithAssignmentDto.builder()
@@ -91,8 +96,9 @@ public class AgentManagerService implements IAgentManagerService {
             .slug(agent.getSlug())
             .version(agent.getVersion())
             .featured(agent.getFeatured())
-            .isAssigned(isAssigned)
+            .hasPrimaryResearcher(hasPrimaryResearcher)
             .assignmentInfo(assignmentInfo)
+            .totalContributors(agent.getTotalContributors())
             .build();
     }
 
