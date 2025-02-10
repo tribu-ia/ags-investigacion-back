@@ -37,6 +37,6 @@ public class ResearcherRequest {
     @JsonProperty("agent")
     private String agentId;
 
-    @JsonProperty("role")
-    private String role = "CONTRIBUTOR";
+    @JsonProperty("researcher_type")
+    private String role;
 } 

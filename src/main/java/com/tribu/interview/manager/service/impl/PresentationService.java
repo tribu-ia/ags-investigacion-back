@@ -74,7 +74,7 @@ public class PresentationService implements IPresentationService {
             .build();
     }
 
-    private LocalDateTime getTargetPresentationDate(LocalDateTime currentDate) {
+    public LocalDateTime getTargetPresentationDate(LocalDateTime currentDate) {
         LocalDateTime currentWeekTuesday = currentDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.TUESDAY));
 
         if (currentDate.getDayOfWeek().getValue() > DayOfWeek.TUESDAY.getValue()) {

@@ -217,4 +217,129 @@ public class JdbcPresentationRepository {
         }
     }
 
+    public Optional<Presentation> findCurrentPresentationByAgentIdAndNextAvailablePresentationDate(String agentId) {
+        String sql = """
+            SELECT 
+                p.id,
+                p.presentation_date,
+                p.status,
+                p.presentation_week,
+                p.video_url,
+                p.votes_count,
+                p.is_winner,
+                aa.id as assignment_id,
+                i.id as researcher_id,
+                i.name as researcher_name,
+                i.avatar_url as researcher_avatar_url,
+                i.repository_url as researcher_repository_url,
+                i.linkedin_profile as researcher_linkedin_url,
+                ag.id as agent_id,
+                ag.name as agent_name,
+                p.show_order
+            FROM presentations p
+            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
+            INNER JOIN investigadores i ON aa.investigador_id = i.id
+            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            WHERE ag.id = :agentId
+            AND p.status != 'COMPLETED'
+            ORDER BY p.presentation_date ASC
+            LIMIT 1
+        """;
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("agentId", agentId);
+        
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Presentation> findMostRecentPresentationByEmail(String email) {
+        String sql = """
+            SELECT 
+                p.id,
+                p.presentation_date,
+                p.status,
+                p.presentation_week,
+                p.video_url,
+                p.votes_count,
+                p.is_winner,
+                aa.id as assignment_id,
+                i.id as researcher_id,
+                i.name as researcher_name,
+                i.avatar_url as researcher_avatar_url,
+                i.repository_url as researcher_repository_url,
+                i.linkedin_profile as researcher_linkedin_url,
+                ag.id as agent_id,
+                ag.name as agent_name,
+                p.show_order
+            FROM presentations p
+            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
+            INNER JOIN investigadores i ON aa.investigador_id = i.id
+            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            WHERE i.email = :email
+            AND p.status != 'COMPLETED'
+            ORDER BY p.presentation_date DESC
+            LIMIT 1
+        """;
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("email", email);
+        
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Presentation> findCurrentPresentationByAgentIdAndTargetWeek(String agentId, LocalDateTime targetWeekDate) {
+        String sql = """
+            SELECT 
+                p.id,
+                p.presentation_date,
+                p.status,
+                p.presentation_week,
+                p.video_url,
+                p.votes_count,
+                p.is_winner,
+                aa.id as assignment_id,
+                i.id as researcher_id,
+                i.name as researcher_name,
+                i.avatar_url as researcher_avatar_url,
+                i.repository_url as researcher_repository_url,
+                i.linkedin_profile as researcher_linkedin_url,
+                ag.id as agent_id,
+                ag.name as agent_name,
+                p.show_order
+            FROM presentations p
+            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
+            INNER JOIN investigadores i ON aa.investigador_id = i.id
+            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
+            WHERE ag.id = :agentId
+            AND p.status != 'COMPLETED'
+            AND p.presentation_date BETWEEN :weekStart AND :weekEnd
+            ORDER BY p.presentation_date ASC
+            LIMIT 1
+        """;
+        
+        LocalDateTime weekStart = targetWeekDate.minusDays(targetWeekDate.getDayOfWeek().getValue() - 1)
+            .withHour(0).withMinute(0).withSecond(0);
+        LocalDateTime weekEnd = weekStart.plusDays(6)
+            .withHour(23).withMinute(59).withSecond(59);
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("agentId", agentId)
+            .addValue("weekStart", weekStart)
+            .addValue("weekEnd", weekEnd);
+        
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
 } 

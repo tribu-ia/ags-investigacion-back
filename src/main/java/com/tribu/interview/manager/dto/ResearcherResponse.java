@@ -1,5 +1,6 @@
 package com.tribu.interview.manager.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,5 +15,7 @@ public class ResearcherResponse {
     private String errorType;
     private String errorCode;
     private LocalDateTime presentationDateTime;
+    @JsonProperty("researcher_type")
+    private String role;
 
 }

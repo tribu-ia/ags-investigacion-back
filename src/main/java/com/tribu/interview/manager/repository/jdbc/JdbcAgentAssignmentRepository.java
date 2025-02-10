@@ -189,4 +189,21 @@ public class JdbcAgentAssignmentRepository {
             return Optional.empty();
         }
     }
+
+    public boolean existsByResearcherIdAndAgentId(String researcherId, String agentId) {
+        String sql = """
+            SELECT COUNT(*)
+            FROM agent_assignments
+            WHERE investigador_id = :researcherId
+            AND agent_id = :agentId
+            AND status = 'active'
+        """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("researcherId", researcherId)
+            .addValue("agentId", agentId);
+
+        Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
+        return count != null && count > 0;
+    }
 } 

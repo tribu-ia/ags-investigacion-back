@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -42,59 +43,58 @@ public class ResearcherService implements IResearcherService {
     public ResearcherResponse createResearcher(ResearcherRequest request) {
         log.info("Creating new researcher with email: {}", request.getEmail());
 
-
-        validateRequest(request);
+        validateAgentExists(request.getAgentId());
         GithubUserResponse githubData = fetchGithubData(request.getGithubUsername());
 
-        // Create researcher
-        Researcher researcher = createResearcherEntity(request, githubData);
-        researcher = researcherRepository.save(researcher);
-        log.info("Researcher created with ID: {}", researcher.getId());
+        // Obtener o crear investigador
+        Researcher researcher = researcherRepository.findByEmail(request.getEmail())
+            .map(existing -> updateExistingResearcher(existing, request, githubData))
+            .orElseGet(() -> createAndSaveNewResearcher(request, githubData));
 
         // Create assignment and schedule presentation
         AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId());
         log.info("Assignment created for researcher: {} and agent: {}",
             researcher.getId(), request.getAgentId());
 
-
         Presentation presentation = null;
-        if (request.getRole().equals(ResearcherTypeEnum.PRIMARY.name())){
+        if (request.getRole().equalsIgnoreCase(ResearcherTypeEnum.PRIMARY.name())){
             presentation = presentationService.createPresentation(assignment);
             log.info("Presentation scheduled for week: {}", presentation);
         }
         
         return buildSuccessResponse(researcher,
-                request.getAgentId(), Objects.requireNonNull(presentation));
+                request.getAgentId(), presentation, researcher.getRole());
     }
 
-    private void validateRequest(ResearcherRequest request) {
-        validateUniqueEmail(request.getEmail());
-        validateAgentAvailability(request.getAgentId());
-        validateAgentExists(request.getAgentId());
-    }
-
-    private void validateUniqueEmail(String email) {
-        if (researcherRepository.existsByEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
-                "An account with this email already exists");
+    private Researcher updateExistingResearcher(Researcher existing, ResearcherRequest request, GithubUserResponse githubData) {
+        // Actualizar solo si hay cambios en la información
+        if (!existing.getGithubUsername().equals(request.getGithubUsername())) {
+            existing.setGithubUsername(request.getGithubUsername());
+            existing.setAvatarUrl(githubData.getAvatarUrl());
+            existing.setRepositoryUrl(githubData.getHtmlUrl());
         }
+        if (!existing.getPhone().equals(request.getPhone())) {
+            existing.setPhone(request.getPhone());
+        }
+        if (!existing.getLinkedinProfile().equals(request.getLinkedinProfile())) {
+            existing.setLinkedinProfile(request.getLinkedinProfile());
+        }
+        
+        return researcherRepository.save(existing);
     }
+
+    private Researcher createAndSaveNewResearcher(ResearcherRequest request, GithubUserResponse githubData) {
+        Researcher researcher = createResearcherEntity(request, githubData);
+        researcher = researcherRepository.save(researcher);
+        log.info("Researcher created with ID: {}", researcher.getId());
+        return researcher;
+    }
+
 
     private void validateAgentExists(String agentId) {
         if (aiAgentRepository.findById(agentId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, 
                 "Agent not found");
-        }
-    }
-
-    private void validateAgentAvailability(String agentId) {
-        Optional<AgentAssignment> existingAssignment = 
-            assignmentRepository.findActiveAssignmentByAgentId(agentId);
-        
-        if (existingAssignment.isPresent()) {
-            Researcher currentResearcher = existingAssignment.get().getResearcher();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
-                String.format("Agent is already assigned to %s", currentResearcher.getName()));
         }
     }
 
@@ -122,20 +122,41 @@ public class ResearcherService implements IResearcherService {
         AIAgent agent = aiAgentRepository.findById(agentId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found"));
 
-        return assignmentRepository.save(AgentAssignment.builder()
-            .researcher(researcher)
-            .agent(agent)
-            .status("active")
-            .assignedAt(LocalDateTime.now())
-            .build());
+        // Primero verificamos si ya existe la asignación
+        if (assignmentRepository.existsByResearcherIdAndAgentId(researcher.getId(), agentId)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT, 
+                "Ya tienes una asignación activa para este agente"
+            );
+        }
+
+        try {
+            return assignmentRepository.save(AgentAssignment.builder()
+                .researcher(researcher)
+                .agent(agent)
+                .status("active")
+                .assignedAt(LocalDateTime.now())
+                .build());
+        } catch (DataIntegrityViolationException e) {
+            // Por si ocurre una condición de carrera
+            if (e.getMessage() != null && e.getMessage().contains("unique_assignment_pair")) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, 
+                    "Ya tienes una asignación activa para este agente"
+                );
+            }
+            throw e;
+        }
     }
 
     private ResearcherResponse buildSuccessResponse(Researcher researcher,
                                                     String agentId,
-                                                    Presentation presentation) {
+                                                    Presentation presentation,
+                                                    String role) {
         return ResearcherResponse.builder()
             .success(true)
             .message("Successfully created account and assigned agent")
+                .role(role)
             .data(ResearcherData.builder()
                 .id(researcher.getId())
                 .name(researcher.getName())
