@@ -36,6 +36,12 @@ public class AgentManagerController {
         return ResponseEntity.ok(agentManagerService.getAgents(page, pageSize, category, industry, search));
     }
 
+    @GetMapping("/researchers/{email}")
+    public ResponseEntity<List<AgentResearcherResponseDto>> getActiveAgents(@RequestParam(defaultValue = "active") String state,
+                                                                            @PathVariable String email) {
+        return ResponseEntity.ok(agentManagerService.getActiveAgents(state,email));
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<StatsDto> getStats() {
         return ResponseEntity.ok(agentManagerService.getStats());

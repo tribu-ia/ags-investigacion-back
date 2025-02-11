@@ -19,5 +19,4 @@ public class Researcher {
     private String repositoryUrl;
     private String linkedinProfile;
     private LocalDateTime createdAt;
-    private String role;
 } 

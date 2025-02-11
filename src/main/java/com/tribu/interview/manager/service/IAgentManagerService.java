@@ -20,4 +20,5 @@ public interface IAgentManagerService {
      */
     PaginatedAgentResponse getAgents(int page, int pageSize, String category, String industry, String search);
 
+    List<AgentResearcherResponseDto> getActiveAgents(String state, String email);
 }

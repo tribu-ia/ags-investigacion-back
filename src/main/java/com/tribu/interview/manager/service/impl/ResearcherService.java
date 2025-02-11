@@ -52,18 +52,17 @@ public class ResearcherService implements IResearcherService {
             .orElseGet(() -> createAndSaveNewResearcher(request, githubData));
 
         // Create assignment and schedule presentation
-        AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId());
+        AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId(), request.getRole());
         log.info("Assignment created for researcher: {} and agent: {}",
             researcher.getId(), request.getAgentId());
 
         Presentation presentation = null;
-        if (request.getRole().equalsIgnoreCase(ResearcherTypeEnum.PRIMARY.name())){
+        if (assignment.getRole().equalsIgnoreCase("PRIMARY")) {
             presentation = presentationService.createPresentation(assignment);
             log.info("Presentation scheduled for week: {}", presentation);
         }
         
-        return buildSuccessResponse(researcher,
-                request.getAgentId(), presentation, researcher.getRole());
+        return buildSuccessResponse(researcher, assignment, presentation);
     }
 
     private Researcher updateExistingResearcher(Researcher existing, ResearcherRequest request, GithubUserResponse githubData) {
@@ -113,32 +112,36 @@ public class ResearcherService implements IResearcherService {
             .avatarUrl(githubData.getAvatarUrl())
             .repositoryUrl(githubData.getHtmlUrl())
             .linkedinProfile(request.getLinkedinProfile())
-            .role(request.getRole())
             .createdAt(LocalDateTime.now())
             .build();
     }
 
-    private AgentAssignment createAgentAssignment(Researcher researcher, String agentId) {
+    private AgentAssignment createAgentAssignment(Researcher researcher,
+                                                  String agentId,
+                                                  String roleRequest) {
+
         AIAgent agent = aiAgentRepository.findById(agentId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent not found"));
 
-        // Primero verificamos si ya existe la asignación
-        if (assignmentRepository.existsByResearcherIdAndAgentId(researcher.getId(), agentId)) {
-            throw new ResponseStatusException(
-                HttpStatus.CONFLICT, 
-                "Ya tienes una asignación activa para este agente"
-            );
+        String role = "";
+        if(ResearcherTypeEnum.CONTRIBUTOR.name().equalsIgnoreCase(roleRequest)){
+            role = ResearcherTypeEnum.CONTRIBUTOR.name();
+            validateContributorResearcher(researcher, agentId);
+        } else {
+            role = ResearcherTypeEnum.PRIMARY.name();
+            validatePrimaryResearcher(researcher, agentId);
         }
+
 
         try {
             return assignmentRepository.save(AgentAssignment.builder()
                 .researcher(researcher)
                 .agent(agent)
                 .status("active")
+                .role(role)
                 .assignedAt(LocalDateTime.now())
                 .build());
         } catch (DataIntegrityViolationException e) {
-            // Por si ocurre una condición de carrera
             if (e.getMessage() != null && e.getMessage().contains("unique_assignment_pair")) {
                 throw new ResponseStatusException(
                     HttpStatus.CONFLICT, 
@@ -149,14 +152,37 @@ public class ResearcherService implements IResearcherService {
         }
     }
 
-    private ResearcherResponse buildSuccessResponse(Researcher researcher,
-                                                    String agentId,
-                                                    Presentation presentation,
-                                                    String role) {
+    private void validateContributorResearcher(Researcher researcher, String agentId) {
+
+
+        boolean existAssignment = assignmentRepository.existsByResearcherIdAndAgentIdWhitContributorRole(researcher.getId());
+
+        if (existAssignment){
+            throw new AssigmentOpenException("Tienes una investigación abierta debes cerrarla antes de generar una nueva documentación");
+        }
+
+        validatePrimaryResearcher(researcher, agentId);
+    }
+
+    private void validatePrimaryResearcher(Researcher researcher, String agentId) {
+
+        boolean existAssignment = assignmentRepository.existsByResearcherIdAndAgentId(researcher.getId(), agentId);
+
+        if (existAssignment){
+            throw new AssigmentOpenException("Tienes una investigación con el mismo agente abierta debes cerrarla antes de generar una nueva documentación");
+        }
+    }
+
+
+
+    private ResearcherResponse buildSuccessResponse(
+            Researcher researcher,
+            AgentAssignment assignment,
+            Presentation presentation) {
         return ResearcherResponse.builder()
             .success(true)
             .message("Successfully created account and assigned agent")
-                .role(role)
+            .role(assignment.getRole())
             .data(ResearcherData.builder()
                 .id(researcher.getId())
                 .name(researcher.getName())
@@ -166,9 +192,9 @@ public class ResearcherService implements IResearcherService {
                 .avatarUrl(researcher.getAvatarUrl())
                 .repositoryUrl(researcher.getRepositoryUrl())
                 .linkedinProfile(researcher.getLinkedinProfile())
-                .agentId(agentId)
+                .agentId(assignment.getAgent().getId())
                 .status("assigned")
-                .role(researcher.getRole())
+                .role(assignment.getRole())
                 .build())
             .presentationDateTime(presentation != null ? presentation.getPresentationDate() : null)
             .build();
@@ -200,45 +226,44 @@ public class ResearcherService implements IResearcherService {
             researcher.setGithubUsername(updateDto.getGithubUsername());
         }
 
-        researcher.setRole(updateDto.getCurrentRole());
         researcher.setLinkedinProfile(updateDto.getLinkedinProfile());
 
         researcher = researcherRepository.save(researcher);
+
         Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
         Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
 
         return buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
     }
 
-    private ResearcherDetailDto buildResearcherDetailDto(Researcher researcher,
-                                                         Presentation presentation,
-                                                         AgentAssignment assignment) {
+    private ResearcherDetailDto buildResearcherDetailDto(
+            Researcher researcher,
+            Presentation presentation,
+            AgentAssignment assignment) {
         ResearcherDetailDto.ResearcherDetailDtoBuilder builder = ResearcherDetailDto.builder()
             .name(researcher.getName())
             .email(researcher.getEmail())
             .avatarUrl(researcher.getAvatarUrl())
             .repositoryUrl(researcher.getRepositoryUrl())
             .linkedinProfile(researcher.getLinkedinProfile())
-            .role(researcher.getRole())
             .githubUsername(researcher.getGithubUsername());
+
+        if (assignment != null) {
+            builder.role(assignment.getRole())
+                .agentName(assignment.getAgent().getName())
+                .agentDescription(assignment.getAgent().getShortDescription())
+                .agentCategory(assignment.getAgent().getCategory())
+                .agentIndustry(assignment.getAgent().getIndustry())
+                .assignmentId(assignment.getId());
+        }
 
         if (presentation != null) {
             builder
                 .presentationDate(presentation.getPresentationDate().format(DATE_FORMATTER))
                 .presentationTime(presentation.getPresentationDate().format(TIME_FORMATTER))
                 .status(presentation.getStatus())
-                .presentationWeek(String.valueOf(presentation.getPresentationWeek()));
-            builder.showOrder(presentation.getShowOrder());
-        }
-
-        if (assignment != null) {
-
-            builder.agentName(assignment.getAgent().getName());
-            builder.agentDescription(assignment.getAgent().getShortDescription());
-            builder.agentCategory(assignment.getAgent().getCategory());
-            builder.agentIndustry(assignment.getAgent().getIndustry());
-            builder.assignmentId(assignment.getId());
-
+                .presentationWeek(String.valueOf(presentation.getPresentationWeek()))
+                .showOrder(presentation.getShowOrder());
         }
 
         return builder.build();

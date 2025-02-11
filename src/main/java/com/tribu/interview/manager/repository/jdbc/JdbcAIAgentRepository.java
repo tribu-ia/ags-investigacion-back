@@ -1,5 +1,6 @@
 package com.tribu.interview.manager.repository.jdbc;
 
+import com.tribu.interview.manager.dto.AgentResearcherResponseDto;
 import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.repository.mapper.AIAgentRowMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,10 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,20 +35,34 @@ public class JdbcAIAgentRepository {
                a.created_at, a.slug, a.version, a.featured,
                aa.status as assignment_status,
                aa.assigned_at,
+               aa.role as assignment_role,
                r.name as assigned_to_name,
                r.email as assigned_to_email,
-               r.role as assigned_role,
                (SELECT COUNT(*) FROM agent_assignments aa2 
                 WHERE aa2.agent_id = a.id 
                 AND aa2.status = 'active') as total_contributors
         FROM ai_agents a
         LEFT JOIN agent_assignments aa ON a.id = aa.agent_id 
             AND aa.status = 'active' 
-            AND EXISTS (
-                SELECT 1 FROM investigadores i 
-                WHERE i.id = aa.investigador_id 
-                AND i.role = 'PRIMARY'
-            )
+            AND aa.role = 'PRIMARY'
+        LEFT JOIN investigadores r ON aa.investigador_id = r.id
+    """;
+
+    private static final String SELECT_BASE_2 = """
+        SELECT 
+            a.id, 
+            a.name, 
+            a.short_description,
+            a.category,
+            a.industry,
+            aa.status as assignment_status,
+            aa.role as assignment_role,
+            aa.assigned_at,
+            r.name as assigned_to_name,
+            r.email as assigned_to_email
+        FROM ai_agents a
+        LEFT JOIN agent_assignments aa ON a.id = aa.agent_id 
+            AND aa.status = 'active'
         LEFT JOIN investigadores r ON aa.investigador_id = r.id
     """;
 
@@ -202,4 +221,35 @@ public class JdbcAIAgentRepository {
             .addValue("version", agent.getVersion())
             .addValue("featured", agent.getFeatured());
     }
-} 
+
+    public List<AgentResearcherResponseDto> findAllByStateAndResearcherId(String state, String researcherId) {
+        String sql = SELECT_BASE_2;
+        MapSqlParameterSource params = new MapSqlParameterSource();
+
+        if (state != null && !state.isEmpty()) {
+            sql += " WHERE aa.status = :state";
+            params.addValue("state", state);
+        }
+        if (researcherId != null && !researcherId.isEmpty()) {
+            sql += sql.contains("WHERE") ? " AND" : " WHERE";
+            sql += " aa.investigador_id = :researcherId";
+            params.addValue("researcherId", researcherId);
+        }
+
+        return jdbcTemplate.query(sql, params, (rs, rowNum) ->
+            AgentResearcherResponseDto.builder()
+                .id(rs.getString("id"))
+                .name(rs.getString("name"))
+                .shortDescription(rs.getString("short_description"))
+                .category(rs.getString("category"))
+                .industry(rs.getString("industry"))
+                    .role(rs.getString("assignment_role"))
+                .build()
+        );
+    }
+
+    private LocalDateTime getLocalDateTime(ResultSet rs, String columnName) throws SQLException {
+        Timestamp timestamp = rs.getTimestamp(columnName);
+        return timestamp != null ? timestamp.toLocalDateTime() : null;
+    }
+}

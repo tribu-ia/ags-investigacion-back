@@ -21,17 +21,16 @@ public class JdbcResearcherRepository {
 
     private static final String SELECT_BASE = """
         SELECT id, name, email, phone, github_username, avatar_url, 
-               repository_url, linkedin_profile, role
+               repository_url, linkedin_profile
         FROM investigadores
     """;
 
     private static final String INSERT_SQL = """
         INSERT INTO investigadores (
             id, name, email, phone, github_username, 
-            avatar_url, repository_url, linkedin_profile, role
+            avatar_url, repository_url, linkedin_profile
         ) VALUES (
-            :id, :name, :email, :phone, :githubUsername,
-            :avatarUrl, :repositoryUrl, :linkedinProfile, :role
+            :id, :name, :email, :phone, :githubUsername
         )
     """;
 
@@ -43,8 +42,7 @@ public class JdbcResearcherRepository {
             github_username = :githubUsername,
             avatar_url = :avatarUrl,
             repository_url = :repositoryUrl,
-            linkedin_profile = :linkedinProfile,
-            role = :role
+            linkedin_profile = :linkedinProfile
         WHERE id = :id
     """;
 
@@ -88,7 +86,6 @@ public class JdbcResearcherRepository {
                     .avatarUrl(rs.getString("avatar_url"))
                     .repositoryUrl(rs.getString("repository_url"))
                     .linkedinProfile(rs.getString("linkedin_profile"))
-                    .role(rs.getString("current_rol"))
                     .build()
             ));
         } catch (EmptyResultDataAccessException e) {
@@ -137,8 +134,7 @@ public class JdbcResearcherRepository {
             .addValue("githubUsername", researcher.getGithubUsername())
             .addValue("avatarUrl", researcher.getAvatarUrl())
             .addValue("repositoryUrl", researcher.getRepositoryUrl())
-            .addValue("linkedinProfile", researcher.getLinkedinProfile())
-            .addValue("role", researcher.getRole());
+            .addValue("linkedinProfile", researcher.getLinkedinProfile());
     }
 
     public boolean existsByEmail(String email) {

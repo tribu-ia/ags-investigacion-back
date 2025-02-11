@@ -4,9 +4,11 @@ import com.tribu.interview.manager.dto.*;
 import com.tribu.interview.manager.model.*;
 import com.tribu.interview.manager.repository.jdbc.JdbcAIAgentRepository;
 import com.tribu.interview.manager.repository.jdbc.JdbcAgentAssignmentRepository;
+import com.tribu.interview.manager.repository.jdbc.JdbcResearcherRepository;
 import com.tribu.interview.manager.service.IAgentManagerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -21,7 +23,8 @@ import java.util.stream.Collectors;
 public class AgentManagerService implements IAgentManagerService {
     private final JdbcAIAgentRepository aiAgentRepository;
     private final JdbcAgentAssignmentRepository assignmentRepository;
-    
+    private final JdbcResearcherRepository researcherRepository;
+
     @Override
     public List<AIAgent> processJsonData(AgentUploadRequest payload) {
         List<AIAgent> agents = payload.getData().get(0).getJson().getData().stream()
@@ -54,6 +57,13 @@ public class AgentManagerService implements IAgentManagerService {
             .totalPages((int) Math.ceil((double) agents.size() / pageSize))
             .currentPage(page)
             .build();
+    }
+
+    @Override
+    public List<AgentResearcherResponseDto> getActiveAgents(String state, String email) {
+        Researcher researcher = researcherRepository.findByEmail(email).orElseThrow();
+
+        return aiAgentRepository.findAllByStateAndResearcherId(state, researcher.getId());
     }
 
     private AgentWithAssignmentDto mapToAgentWithAssignmentDto(AIAgent agent) {

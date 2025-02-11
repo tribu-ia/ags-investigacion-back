@@ -52,7 +52,7 @@ public class JdbcPresentationRepository {
                 i.repository_url,
                 i.linkedin_profile,
                 p.presentation_date,
-                i.current_rol,
+                aa.role as researcher_role,
                 ag.name as agent_name
             FROM presentations p
             INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
@@ -73,7 +73,7 @@ public class JdbcPresentationRepository {
                 .avatarUrl(rs.getString("avatar_url"))
                 .repositoryUrl(rs.getString("repository_url"))
                 .linkedinUrl(rs.getString("linkedin_profile"))
-                .role(rs.getString("current_rol"))
+                .role(rs.getString("researcher_role"))
                 .presentation(rs.getString("agent_name"))
                 .presentationDateTime(rs.getTimestamp("presentation_date").toLocalDateTime())
                 .build()

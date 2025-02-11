@@ -1,5 +1,6 @@
 package com.tribu.interview.manager.repository.jdbc;
 
+import com.tribu.interview.manager.dto.enums.ResearcherTypeEnum;
 import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.model.Researcher;
@@ -11,17 +12,25 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.dao.EmptyResultDataAccessException;
+import lombok.extern.slf4j.Slf4j;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class JdbcAgentAssignmentRepository {
     
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AgentAssignmentRowMapper rowMapper = new AgentAssignmentRowMapper();
+
+
+
+
 
     private static final String SELECT_BASE = """
         SELECT 
@@ -77,13 +86,12 @@ public class JdbcAgentAssignmentRepository {
 
     private AgentAssignment insert(AgentAssignment assignment) {
         String sql = """
-            INSERT INTO agent_assignments (id, investigador_id, agent_id, status, assigned_at)
-            VALUES (:id, :researcherId, :agentId, :status, :assignedAt)
+            INSERT INTO agent_assignments (id, investigador_id, agent_id, status, assigned_at, role)
+            VALUES (:id, :researcherId, :agentId, :status, :assignedAt, :role)
         """;
 
         String id = UUID.randomUUID().toString();
-        MapSqlParameterSource params = createParameterSource(assignment)
-            .addValue("id", id);
+        MapSqlParameterSource params = createParams(assignment, id);
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(sql, params, keyHolder);
@@ -98,22 +106,24 @@ public class JdbcAgentAssignmentRepository {
             SET investigador_id = :researcherId,
                 agent_id = :agentId,
                 status = :status,
+                role = :role,
                 assigned_at = :assignedAt
             WHERE id = :id
         """;
 
-        MapSqlParameterSource params = createParameterSource(assignment)
-            .addValue("id", assignment.getId());
+        MapSqlParameterSource params = createParams(assignment, assignment.getId());
 
         jdbcTemplate.update(sql, params);
         return assignment;
     }
 
-    private MapSqlParameterSource createParameterSource(AgentAssignment assignment) {
+    private MapSqlParameterSource createParams(AgentAssignment assignment, String id) {
         return new MapSqlParameterSource()
+            .addValue("id", id)
             .addValue("researcherId", assignment.getResearcher().getId())
             .addValue("agentId", assignment.getAgent().getId())
             .addValue("status", assignment.getStatus())
+            .addValue("role", assignment.getRole())
             .addValue("assignedAt", assignment.getAssignedAt());
     }
 
@@ -132,6 +142,7 @@ public class JdbcAgentAssignmentRepository {
                 aa.id,
                 aa.status,
                 aa.assigned_at,
+                aa.role,
                 i.id as researcher_id,
                 i.name as researcher_name,
                 i.email as researcher_email,
@@ -182,6 +193,7 @@ public class JdbcAgentAssignmentRepository {
                     .researcher(researcher)
                     .agent(agent)
                     .status(rs.getString("status"))
+                    .role(rs.getString("role"))
                     .assignedAt(rs.getTimestamp("assigned_at").toLocalDateTime())
                     .build();
             }));
@@ -205,5 +217,74 @@ public class JdbcAgentAssignmentRepository {
 
         Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
         return count != null && count > 0;
+    }
+
+    public boolean existsByResearcherIdAndAgentIdWhitContributorRole(String researcherId) {
+        String role = ResearcherTypeEnum.CONTRIBUTOR.name();
+
+        String sql = """
+            SELECT COUNT(*)
+            FROM agent_assignments
+            WHERE investigador_id = :researcherId
+            AND status = 'active'
+            AND role = :role
+        """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("researcherId", researcherId)
+                .addValue("role", role);
+
+        Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
+        return count != null && count > 0;
+    }
+
+
+    public boolean existsByAgentIdAndRole(String agentId, String role) {
+        String sql = """
+            SELECT COUNT(*)
+            FROM agent_assignments
+            WHERE agent_id = :agentId
+            AND role = :role
+            AND status = 'active'
+        """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("agentId", agentId)
+            .addValue("role", role);
+
+        Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
+        return count != null && count > 0;
+    }
+
+    private AgentAssignment mapToAgentAssignment(ResultSet rs, int rowNum) throws SQLException {
+        return AgentAssignment.builder()
+            .id(rs.getString("id"))
+            .researcher(mapToResearcher(rs))
+            .agent(mapToAgent(rs))
+            .status(rs.getString("status"))
+            .role(rs.getString("role"))
+            .assignedAt(rs.getTimestamp("assigned_at").toLocalDateTime())
+            .build();
+    }
+
+    private Researcher mapToResearcher(ResultSet rs) throws SQLException {
+        return Researcher.builder()
+            .id(rs.getString("researcher_id"))
+            .name(rs.getString("researcher_name"))
+            .email(rs.getString("researcher_email"))
+            .avatarUrl(rs.getString("researcher_avatar_url"))
+            .repositoryUrl(rs.getString("researcher_repository_url"))
+            .linkedinProfile(rs.getString("researcher_linkedin_url"))
+            .build();
+    }
+
+    private AIAgent mapToAgent(ResultSet rs) throws SQLException {
+        return AIAgent.builder()
+            .id(rs.getString("agent_id"))
+            .name(rs.getString("agent_name"))
+            .industry(rs.getString("agent_industry"))
+            .category(rs.getString("agent_category"))
+            .shortDescription(rs.getString("agent_description"))
+            .build();
     }
 } 
