@@ -38,6 +38,8 @@ public class AgentDocumentationService {
     }
     
     public AgentDocumentation finalizeDocumentation(FinalizeDocumentationRequest request) {
+
+
         // Obtener la documentación existente
         AgentDocumentation documentation = documentationRepository
             .findByAssignmentId(request.getAssignmentId())
@@ -60,6 +62,7 @@ public class AgentDocumentationService {
             folderPath,
             documentName,
             documentation.getMarkdownContent(),
+                assignment.getResearcher().getName(),
             request.getDocuments()
         );
         

@@ -63,17 +63,22 @@ public class GithubService implements IGithubService {
     public String uploadDocumentation(
             String folderPath, 
             String documentName,
-            String markdownContent, 
+            String markdownContent,
+            String researcherName,
             List<MultipartFile> documents) {
         try {
+            // Formatear el nombre del investigador y crear la ruta completa
+            String formattedResearcherName = sanitizeFileName(researcherName);
+            String completeFolderPath = folderPath + "/" + formattedResearcherName;
+
             // 1. Crear el archivo markdown principal
-            String markdownPath = folderPath + "/" + documentName;
+            String markdownPath = completeFolderPath + "/" + documentName;
             String encodedMarkdown = Base64.getEncoder().encodeToString(markdownContent.getBytes(StandardCharsets.UTF_8));
-            createOrUpdateFile(markdownPath, "Add documentation for " + folderPath, encodedMarkdown);
+            createOrUpdateFile(markdownPath, "Add documentation for " + completeFolderPath, encodedMarkdown);
             
             // 2. Subir cada documento adjunto
             for (MultipartFile document : documents) {
-                String filePath = folderPath + "/" + sanitizeFileName(document.getOriginalFilename());
+                String filePath = completeFolderPath + "/" + sanitizeFileName(document.getOriginalFilename());
                 byte[] content = document.getBytes();
                 String base64Content = Base64.getEncoder().encodeToString(content);
                 
@@ -83,7 +88,7 @@ public class GithubService implements IGithubService {
             }
             
             return String.format("https://github.com/%s/%s/tree/main/%s", 
-                repositoryOwner, repositoryName, folderPath);
+                repositoryOwner, repositoryName, completeFolderPath);
                 
         } catch (Exception e) {
             log.error("Error uploading to GitHub: {}", e.getMessage());

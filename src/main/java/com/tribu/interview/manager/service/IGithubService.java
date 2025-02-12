@@ -13,5 +13,6 @@ public interface IGithubService {
             String folderPath,
             String documentName,
             String markdownContent,
+            String researcherName,
             List<MultipartFile> documents);
 }

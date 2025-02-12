@@ -28,10 +28,6 @@ public class JdbcAgentAssignmentRepository {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final AgentAssignmentRowMapper rowMapper = new AgentAssignmentRowMapper();
 
-
-
-
-
     private static final String SELECT_BASE = """
         SELECT 
             aa.id as id,
