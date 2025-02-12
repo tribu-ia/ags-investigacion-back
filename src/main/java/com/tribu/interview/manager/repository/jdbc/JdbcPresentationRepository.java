@@ -217,46 +217,12 @@ public class JdbcPresentationRepository {
         }
     }
 
-    public Optional<Presentation> findCurrentPresentationByAgentIdAndNextAvailablePresentationDate(String agentId) {
-        String sql = """
-            SELECT 
-                p.id,
-                p.presentation_date,
-                p.status,
-                p.presentation_week,
-                p.video_url,
-                p.votes_count,
-                p.is_winner,
-                aa.id as assignment_id,
-                i.id as researcher_id,
-                i.name as researcher_name,
-                i.avatar_url as researcher_avatar_url,
-                i.repository_url as researcher_repository_url,
-                i.linkedin_profile as researcher_linkedin_url,
-                ag.id as agent_id,
-                ag.name as agent_name,
-                p.show_order
-            FROM presentations p
-            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
-            INNER JOIN investigadores i ON aa.investigador_id = i.id
-            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
-            WHERE ag.id = :agentId
-            AND p.status != 'COMPLETED'
-            ORDER BY p.presentation_date ASC
-            LIMIT 1
-        """;
-        
-        MapSqlParameterSource params = new MapSqlParameterSource()
-            .addValue("agentId", agentId);
-        
-        try {
-            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
-    }
 
-    public Optional<Presentation> findMostRecentPresentationByEmail(String email) {
+    public List<Presentation> findPresentationsByAssignmentIds(List<String> assignmentIds) {
+        if (assignmentIds == null || assignmentIds.isEmpty()) {
+            return List.of();
+        }
+
         String sql = """
             SELECT 
                 p.id,
@@ -274,72 +240,57 @@ public class JdbcPresentationRepository {
                 i.linkedin_profile as researcher_linkedin_url,
                 ag.id as agent_id,
                 ag.name as agent_name,
+                ag.short_description as agent_description,
+                ag.category as agent_category,
+                ag.industry as agent_industry,
                 p.show_order
             FROM presentations p
             INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
             INNER JOIN investigadores i ON aa.investigador_id = i.id
             INNER JOIN ai_agents ag ON aa.agent_id = ag.id
-            WHERE i.email = :email
-            AND p.status != 'COMPLETED'
+            WHERE aa.id IN (:assignmentIds)
             ORDER BY p.presentation_date DESC
-            LIMIT 1
         """;
         
         MapSqlParameterSource params = new MapSqlParameterSource()
-            .addValue("email", email);
+            .addValue("assignmentIds", assignmentIds);
         
-        try {
-            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
-    }
+        return jdbcTemplate.query(sql, params, (rs, rowNum) -> {
+            // Construir el investigador
+            Researcher researcher = Researcher.builder()
+                    .id(rs.getString("researcher_id"))
+                    .name(rs.getString("researcher_name"))
+                    .avatarUrl(rs.getString("researcher_avatar_url"))
+                    .repositoryUrl(rs.getString("researcher_repository_url"))
+                    .linkedinProfile(rs.getString("researcher_linkedin_url"))
+                    .build();
 
-    public Optional<Presentation> findCurrentPresentationByAgentIdAndTargetWeek(String agentId, LocalDateTime targetWeekDate) {
-        String sql = """
-            SELECT 
-                p.id,
-                p.presentation_date,
-                p.status,
-                p.presentation_week,
-                p.video_url,
-                p.votes_count,
-                p.is_winner,
-                aa.id as assignment_id,
-                i.id as researcher_id,
-                i.name as researcher_name,
-                i.avatar_url as researcher_avatar_url,
-                i.repository_url as researcher_repository_url,
-                i.linkedin_profile as researcher_linkedin_url,
-                ag.id as agent_id,
-                ag.name as agent_name,
-                p.show_order
-            FROM presentations p
-            INNER JOIN agent_assignments aa ON p.assignment_id = aa.id
-            INNER JOIN investigadores i ON aa.investigador_id = i.id
-            INNER JOIN ai_agents ag ON aa.agent_id = ag.id
-            WHERE ag.id = :agentId
-            AND p.status != 'COMPLETED'
-            AND p.presentation_date BETWEEN :weekStart AND :weekEnd
-            ORDER BY p.presentation_date ASC
-            LIMIT 1
-        """;
-        
-        LocalDateTime weekStart = targetWeekDate.minusDays(targetWeekDate.getDayOfWeek().getValue() - 1)
-            .withHour(0).withMinute(0).withSecond(0);
-        LocalDateTime weekEnd = weekStart.plusDays(6)
-            .withHour(23).withMinute(59).withSecond(59);
-        
-        MapSqlParameterSource params = new MapSqlParameterSource()
-            .addValue("agentId", agentId)
-            .addValue("weekStart", weekStart)
-            .addValue("weekEnd", weekEnd);
-        
-        try {
-            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, params, rowMapper));
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
+            // Construir el agente
+            AIAgent agent = AIAgent.builder()
+                    .id(rs.getString("agent_id"))
+                    .name(rs.getString("agent_name"))
+                    .build();
+
+            // Construir la asignación
+            AgentAssignment assignment = AgentAssignment.builder()
+                    .id(rs.getString("assignment_id"))
+                    .researcher(researcher)
+                    .agent(agent)
+                    .build();
+
+            // Construir la presentación
+            return Presentation.builder()
+                    .id(rs.getString("id"))
+                    .assignment(assignment)
+                    .presentationDate(rs.getTimestamp("presentation_date").toLocalDateTime())
+                    .status(rs.getString("status"))
+                    .presentationWeek(rs.getInt("presentation_week"))
+                    .videoUrl(rs.getString("video_url"))
+                    .votesCount(rs.getInt("votes_count"))
+                    .isWinner(rs.getBoolean("is_winner"))
+                    .showOrder(rs.getInt("show_order"))
+                    .build();
+        });
     }
 
 } 

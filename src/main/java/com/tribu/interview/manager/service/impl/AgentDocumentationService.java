@@ -41,7 +41,10 @@ public class AgentDocumentationService {
         // Obtener la documentación existente
         AgentDocumentation documentation = documentationRepository
             .findByAssignmentId(request.getAssignmentId())
-            .orElseThrow(() -> new ResourceNotFoundException("Documentation not found"));
+            .orElse(saveMarkdown(SaveMarkdownRequest.builder()
+                    .assignmentId(request.getAssignmentId())
+                    .markdownContent(request.getMarkdownContent())
+                    .build()));
             
         // Obtener la asignación y el agente
         AgentAssignment assignment = assignmentRepository

@@ -3,9 +3,12 @@ package com.tribu.interview.manager.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class ResearcherDetailDto {
+    private String id;
     private String name;
     private String email;
     private String avatarUrl;
@@ -13,22 +16,8 @@ public class ResearcherDetailDto {
     private String linkedinProfile;
     private String role;
     private String githubUsername;
-    
-    // Presentation info
-    private String presentationDate;
-    private String presentationTime;
-    private String status;
-    private String presentationWeek;
-
-    // Agent info
-    private String agentName;
-    private String agentDescription;
-    private String agentCategory;
-    private String agentIndustry;
-
-    // Assignment
-    private String assignmentId;
-
+    private List<AgentPrimaryResearcherResponseDto> primaryResearches;
+    private List<AgentResearcherResponseDto> contributorsResearches;
     // PresentationVideo
     private Integer showOrder;
 

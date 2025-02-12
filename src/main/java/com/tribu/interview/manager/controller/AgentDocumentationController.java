@@ -27,8 +27,10 @@ public class AgentDocumentationController {
     @PostMapping("/finalize")
     public ResponseEntity<AgentDocumentation> finalizeDocumentation(
             @RequestPart("documents") List<MultipartFile> documents,
-            @NotNull() @RequestPart("assignmentId") String assignmentId) {
+            @NotNull() @RequestPart("assignmentId") String assignmentId,
+            @NotNull() @RequestPart("markdownContent") String markdownContent) {
         return ResponseEntity.ok(documentationService.finalizeDocumentation(FinalizeDocumentationRequest.builder()
+                        .markdownContent(markdownContent)
                         .assignmentId(assignmentId)
                         .documents(documents)
                 .build()));

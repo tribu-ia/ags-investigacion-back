@@ -22,7 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -201,13 +201,69 @@ public class ResearcherService implements IResearcherService {
     }
 
     public ResearcherDetailDto getResearcherDetailsByEmail(String email) {
+        // Obtener investigador
         Researcher researcher = researcherRepository.findByEmail(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Investigador no encontrado"));
 
-        Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
-        Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
+        // Obtener todas las investigaciones activas del investigador
+        List<AgentResearcherResponseDto> agentResearcherResponseDtos = aiAgentRepository.findAllByStateAndResearcherId("active",
+                researcher.getId());
 
-        return buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
+        // Separar investigaciones primarias y contribuciones
+        List<AgentResearcherResponseDto> primaryResearches = agentResearcherResponseDtos.stream()
+                .filter(dto -> ResearcherTypeEnum.PRIMARY.name().equalsIgnoreCase(dto.getRole()))
+                .toList();
+
+        List<AgentResearcherResponseDto> contributorResearches = agentResearcherResponseDtos.stream()
+                .filter(dto -> ResearcherTypeEnum.CONTRIBUTOR.name().equalsIgnoreCase(dto.getRole()))
+                .toList();
+
+        // Obtener presentaciones para investigaciones primarias
+        List<String> primaryResearchesAssignmentIds = primaryResearches.stream()
+                .map(AgentResearcherResponseDto::getAssignmentId)
+                .toList();
+
+        List<Presentation> presentations = presentationRepository.findPresentationsByAssignmentIds(primaryResearchesAssignmentIds);
+
+        // Construir el DTO de respuesta
+        return ResearcherDetailDto.builder()
+                .id(researcher.getId())
+                .name(researcher.getName())
+                .email(researcher.getEmail())
+                .avatarUrl(researcher.getAvatarUrl())
+                .repositoryUrl(researcher.getRepositoryUrl())
+                .linkedinProfile(researcher.getLinkedinProfile())
+                .githubUsername(researcher.getGithubUsername())
+                .primaryResearches(mapToPrimaryResearcherResponse(primaryResearches, presentations))
+                .contributorsResearches(contributorResearches)
+                .showOrder(presentations.isEmpty() ? null : presentations.get(0).getShowOrder())
+                .build();
+    }
+
+    private List<AgentPrimaryResearcherResponseDto> mapToPrimaryResearcherResponse(
+            List<AgentResearcherResponseDto> primaryResearches,
+            List<Presentation> presentations) {
+        
+        return primaryResearches.stream()
+                .map(research -> {
+                    // Buscar la presentación correspondiente
+                    Optional<Presentation> presentation = presentations.stream()
+                            .filter(p -> p.getAssignment().getAgent().getId().equals(research.getId()))
+                            .findFirst();
+
+                    return AgentPrimaryResearcherResponseDto.builder()
+                            .assignmentId(research.getId())
+                            .agentName(research.getName())
+                            .agentDescription(research.getShortDescription())
+                            .agentCategory(research.getCategory())
+                            .agentIndustry(research.getIndustry())
+                            .presentationDate(presentation.map(p -> p.getPresentationDate().format(DATE_FORMATTER)).orElse(null))
+                            .presentationTime(presentation.map(p -> p.getPresentationDate().format(TIME_FORMATTER)).orElse(null))
+                            .status(presentation.map(Presentation::getStatus).orElse(null))
+                            .presentationWeek(presentation.map(p -> String.valueOf(p.getPresentationWeek())).orElse(null))
+                            .build();
+                })
+                .toList();
     }
 
     @Transactional
@@ -233,39 +289,7 @@ public class ResearcherService implements IResearcherService {
         Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
         Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
 
-        return buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
+        return null;//buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
     }
 
-    private ResearcherDetailDto buildResearcherDetailDto(
-            Researcher researcher,
-            Presentation presentation,
-            AgentAssignment assignment) {
-        ResearcherDetailDto.ResearcherDetailDtoBuilder builder = ResearcherDetailDto.builder()
-            .name(researcher.getName())
-            .email(researcher.getEmail())
-            .avatarUrl(researcher.getAvatarUrl())
-            .repositoryUrl(researcher.getRepositoryUrl())
-            .linkedinProfile(researcher.getLinkedinProfile())
-            .githubUsername(researcher.getGithubUsername());
-
-        if (assignment != null) {
-            builder.role(assignment.getRole())
-                .agentName(assignment.getAgent().getName())
-                .agentDescription(assignment.getAgent().getShortDescription())
-                .agentCategory(assignment.getAgent().getCategory())
-                .agentIndustry(assignment.getAgent().getIndustry())
-                .assignmentId(assignment.getId());
-        }
-
-        if (presentation != null) {
-            builder
-                .presentationDate(presentation.getPresentationDate().format(DATE_FORMATTER))
-                .presentationTime(presentation.getPresentationDate().format(TIME_FORMATTER))
-                .status(presentation.getStatus())
-                .presentationWeek(String.valueOf(presentation.getPresentationWeek()))
-                .showOrder(presentation.getShowOrder());
-        }
-
-        return builder.build();
-    }
 } 

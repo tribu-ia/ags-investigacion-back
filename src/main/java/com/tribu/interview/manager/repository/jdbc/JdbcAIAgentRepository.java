@@ -58,6 +58,7 @@ public class JdbcAIAgentRepository {
             aa.status as assignment_status,
             aa.role as assignment_role,
             aa.assigned_at,
+            aa.id as assignment_id,
             r.name as assigned_to_name,
             r.email as assigned_to_email
         FROM ai_agents a
@@ -244,6 +245,7 @@ public class JdbcAIAgentRepository {
                 .category(rs.getString("category"))
                 .industry(rs.getString("industry"))
                     .role(rs.getString("assignment_role"))
+                    .assignmentId(rs.getString("assignment_id"))
                 .build()
         );
     }

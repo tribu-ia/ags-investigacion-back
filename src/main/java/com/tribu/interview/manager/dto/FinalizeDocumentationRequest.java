@@ -16,5 +16,7 @@ import java.util.List;
 public class FinalizeDocumentationRequest {
     @NotNull
     private String assignmentId;
+    @NotNull
+    private String markdownContent;
     private List<MultipartFile> documents;
 } 

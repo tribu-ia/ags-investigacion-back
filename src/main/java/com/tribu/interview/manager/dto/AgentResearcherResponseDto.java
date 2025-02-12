@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,4 +17,5 @@ public class AgentResearcherResponseDto {
     private String shortDescription;
     private String longDescription;
     private String role;
+    private String assignmentId;
 }
