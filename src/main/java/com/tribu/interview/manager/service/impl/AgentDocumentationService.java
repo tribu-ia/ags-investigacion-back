@@ -1,5 +1,6 @@
 package com.tribu.interview.manager.service.impl;
 
+import com.tribu.interview.manager.dto.GitDocumentationDto;
 import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.AgentDocumentation;
@@ -37,7 +38,7 @@ public class AgentDocumentationService {
         return documentationRepository.save(documentation);
     }
     
-    public AgentDocumentation finalizeDocumentation(FinalizeDocumentationRequest request) {
+    public GitDocumentationDto finalizeDocumentation(FinalizeDocumentationRequest request) {
 
 
         // Obtener la documentación existente
@@ -68,11 +69,13 @@ public class AgentDocumentationService {
         
         // Actualizar estado y guardar
         documentation.setStatus("COMPLETED");
-        AgentDocumentation savedDoc = documentationRepository.save(documentation);
+        documentationRepository.save(documentation);
         
         log.info("Documentation finalized and uploaded to GitHub: {}", githubUrl);
         
-        return savedDoc;
+        return GitDocumentationDto.builder()
+                .githubPullRequest(githubUrl)
+                .build();
     }
     
     public AgentDocumentation getDocumentation(String assignmentId) {

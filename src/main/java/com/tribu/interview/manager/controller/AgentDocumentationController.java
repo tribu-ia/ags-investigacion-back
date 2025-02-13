@@ -1,6 +1,7 @@
 package com.tribu.interview.manager.controller;
 
 import com.tribu.interview.manager.dto.FinalizeDocumentationRequest;
+import com.tribu.interview.manager.dto.GitDocumentationDto;
 import com.tribu.interview.manager.dto.SaveMarkdownRequest;
 import com.tribu.interview.manager.model.AgentDocumentation;
 import com.tribu.interview.manager.service.impl.AgentDocumentationService;
@@ -25,7 +26,7 @@ public class AgentDocumentationController {
     }
     
     @PostMapping("/finalize")
-    public ResponseEntity<AgentDocumentation> finalizeDocumentation(
+    public ResponseEntity<GitDocumentationDto> finalizeDocumentation(
             @RequestPart("documents") List<MultipartFile> documents,
             @NotNull() @RequestPart("assignmentId") String assignmentId,
             @NotNull() @RequestPart("markdownContent") String markdownContent) {

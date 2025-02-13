@@ -2,24 +2,26 @@ package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.GithubUserResponse;
 import com.tribu.interview.manager.service.IGithubService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.kohsuke.github.GHContentBuilder;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubBuilder;
+import org.kohsuke.github.GHRef;
+import org.kohsuke.github.GHPullRequest;
 
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Base64;
-import java.util.HashMap;
-import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -35,6 +37,15 @@ public class GithubService implements IGithubService {
     
     @Value("${github.repository.name}")
     private String repositoryName;
+
+    private GitHub github;
+    
+    @PostConstruct
+    public void init() throws IOException {
+        github = new GitHubBuilder()
+            .withOAuthToken(githubToken)
+            .build();
+    }
 
     @Override
     public Optional<GithubUserResponse> fetchUserData(String username) {
@@ -67,68 +78,69 @@ public class GithubService implements IGithubService {
             String researcherName,
             List<MultipartFile> documents) {
         try {
-            // Formatear el nombre del investigador y crear la ruta completa
             String formattedResearcherName = sanitizeFileName(researcherName);
             String completeFolderPath = folderPath + "/" + formattedResearcherName;
-
-            // 1. Crear el archivo markdown principal
-            String markdownPath = completeFolderPath + "/" + documentName;
-            String encodedMarkdown = Base64.getEncoder().encodeToString(markdownContent.getBytes(StandardCharsets.UTF_8));
-            createOrUpdateFile(markdownPath, "Add documentation for " + completeFolderPath, encodedMarkdown);
             
-            // 2. Subir cada documento adjunto
-            for (MultipartFile document : documents) {
-                String filePath = completeFolderPath + "/" + sanitizeFileName(document.getOriginalFilename());
-                byte[] content = document.getBytes();
-                String base64Content = Base64.getEncoder().encodeToString(content);
-                
-                createOrUpdateFile(filePath, 
-                    "Add supporting document: " + document.getOriginalFilename(), 
-                    base64Content);
+            // Crear nombre de la rama
+            String branchName = "documentacion/" + completeFolderPath;
+            
+            GHRepository repository = github.getRepository(repositoryOwner + "/" + repositoryName);
+            
+            // Obtener la referencia del último commit en main
+            GHRef mainRef = repository.getRef("heads/main");
+            String mainSha = mainRef.getObject().getSha();
+            
+            // Crear nueva rama desde main
+            try {
+                repository.createRef("refs/heads/" + branchName, mainSha);
+            } catch (IOException e) {
+                log.warn("Branch might already exist: {}", e.getMessage());
             }
             
-            return String.format("https://github.com/%s/%s/tree/main/%s", 
-                repositoryOwner, repositoryName, completeFolderPath);
+            // Subir el archivo markdown principal
+            repository.createContent()
+                     .branch(branchName)
+                     .path(completeFolderPath + "/" + documentName)
+                     .content(markdownContent)
+                     .message("Add main documentation file")
+                     .commit();
+            
+            // Subir cada documento adjunto
+            for (MultipartFile document : documents) {
+                String fileName = sanitizeFileName(document.getOriginalFilename());
+                repository.createContent()
+                         .branch(branchName)
+                         .path(completeFolderPath + "/" + fileName)
+                         .content(document.getBytes())
+                         .message("Add supporting document: " + fileName)
+                         .commit();
+                
+                log.info("Adding file to commit: {}", fileName);
+            }
+            
+            // Crear Pull Request
+            String prTitle = "Documentation for " + completeFolderPath;
+            String prBody = String.format("Generated by research agent for %s\n\nThis PR includes:\n" +
+                                        "- Main documentation file\n" +
+                                        "- %d supporting documents", 
+                                        researcherName, documents.size());
+            
+            GHPullRequest pullRequest = repository.createPullRequest(
+                prTitle,
+                branchName,
+                "main",
+                prBody
+            );
+            
+            log.info("Successfully uploaded {} files to {} and created PR #{}",
+                documents.size() + 1, completeFolderPath, pullRequest.getNumber());
+            
+            // Retornar la URL del Pull Request en lugar de la carpeta
+            return pullRequest.getHtmlUrl().toString();
                 
         } catch (Exception e) {
-            log.error("Error uploading to GitHub: {}", e.getMessage());
+            log.error("Error uploading to GitHub: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to upload documentation to GitHub", e);
-        }
-    }
-    
-    private void createOrUpdateFile(String path, String commitMessage, String base64Content) {
-        String url = String.format("https://api.github.com/repos/%s/%s/contents/%s",
-            repositoryOwner, repositoryName, path);
-            
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + githubToken);
-        headers.set("Accept", "application/vnd.github+json");
-        headers.set("X-GitHub-Api-Version", "2022-11-28");
-        
-        Map<String, String> body = new HashMap<>();
-        body.put("message", commitMessage);
-        body.put("content", base64Content);
-        body.put("branch", "main");
-        
-        try {
-            // Verificar si el archivo existe
-            ResponseEntity<Map> existingFile = restTemplate.exchange(
-                url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
-            
-            if (existingFile.getBody() != null) {
-                body.put("sha", (String) existingFile.getBody().get("sha"));
-            }
-        } catch (HttpClientErrorException.NotFound ignored) {
-            // El archivo no existe, no necesitamos SHA
-        }
-        
-        HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
-        
-        try {
-            restTemplate.exchange(url, HttpMethod.PUT, request, Map.class);
-        } catch (HttpClientErrorException e) {
-            log.error("GitHub API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw e;
         }
     }
     

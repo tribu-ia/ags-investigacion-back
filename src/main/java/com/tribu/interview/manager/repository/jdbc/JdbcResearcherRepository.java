@@ -30,7 +30,8 @@ public class JdbcResearcherRepository {
             id, name, email, phone, github_username, 
             avatar_url, repository_url, linkedin_profile
         ) VALUES (
-            :id, :name, :email, :phone, :githubUsername
+            :id, :name, :email, :phone, :githubUsername,
+            :avatarUrl, :repositoryUrl, :linkedinProfile
         )
     """;
 

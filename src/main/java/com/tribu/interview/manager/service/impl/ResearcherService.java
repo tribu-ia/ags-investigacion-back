@@ -252,7 +252,7 @@ public class ResearcherService implements IResearcherService {
                             .findFirst();
 
                     return AgentPrimaryResearcherResponseDto.builder()
-                            .assignmentId(research.getId())
+                            .assignmentId(research.getAssignmentId())
                             .agentName(research.getName())
                             .agentDescription(research.getShortDescription())
                             .agentCategory(research.getCategory())
