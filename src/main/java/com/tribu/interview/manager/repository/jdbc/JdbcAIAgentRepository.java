@@ -60,10 +60,10 @@ public class JdbcAIAgentRepository {
             aa.assigned_at,
             aa.id as assignment_id,
             r.name as assigned_to_name,
-            r.email as assigned_to_email
+            r.email as assigned_to_email,
+            aa.status
         FROM ai_agents a
-        LEFT JOIN agent_assignments aa ON a.id = aa.agent_id 
-            AND aa.status = 'active'
+        LEFT JOIN agent_assignments aa ON a.id = aa.agent_id
         LEFT JOIN investigadores r ON aa.investigador_id = r.id
     """;
 
@@ -228,14 +228,10 @@ public class JdbcAIAgentRepository {
         MapSqlParameterSource params = new MapSqlParameterSource();
 
         if (state != null && !state.isEmpty()) {
-            sql += " WHERE aa.status = :state";
-            params.addValue("state", state);
-        }
-        if (researcherId != null && !researcherId.isEmpty()) {
-            sql += sql.contains("WHERE") ? " AND" : " WHERE";
-            sql += " aa.investigador_id = :researcherId";
+            sql += " WHERE aa.status in ('active', 'done') AND aa.investigador_id = :researcherId";
             params.addValue("researcherId", researcherId);
         }
+
 
         return jdbcTemplate.query(sql, params, (rs, rowNum) ->
             AgentResearcherResponseDto.builder()
@@ -246,6 +242,7 @@ public class JdbcAIAgentRepository {
                 .industry(rs.getString("industry"))
                     .role(rs.getString("assignment_role"))
                     .assignmentId(rs.getString("assignment_id"))
+                    .status(rs.getString("status"))
                 .build()
         );
     }

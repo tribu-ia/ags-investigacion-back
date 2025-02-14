@@ -234,22 +234,15 @@ public class JdbcAgentAssignmentRepository {
         return count != null && count > 0;
     }
 
-
-    public boolean existsByAgentIdAndRole(String agentId, String role) {
-        String sql = """
-            SELECT COUNT(*)
-            FROM agent_assignments
-            WHERE agent_id = :agentId
-            AND role = :role
-            AND status = 'active'
-        """;
-
+    public boolean updateStatusById(String id, String status) {
+        String sql = "UPDATE agent_assignments SET status = :status WHERE id = :id";
+        
         MapSqlParameterSource params = new MapSqlParameterSource()
-            .addValue("agentId", agentId)
-            .addValue("role", role);
+            .addValue("id", id)
+            .addValue("status", status);
 
-        Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
-        return count != null && count > 0;
+        int rowsAffected = jdbcTemplate.update(sql, params);
+        return rowsAffected > 0;
     }
 
     private AgentAssignment mapToAgentAssignment(ResultSet rs, int rowNum) throws SQLException {

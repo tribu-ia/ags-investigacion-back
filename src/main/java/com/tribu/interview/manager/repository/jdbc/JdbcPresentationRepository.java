@@ -52,7 +52,7 @@ public class JdbcPresentationRepository {
                 i.repository_url,
                 i.linkedin_profile,
                 p.presentation_date,
-                aa.role as researcher_role,
+                i.current_rol as researcher_role,
                 ag.name as agent_name
             FROM presentations p
             INNER JOIN agent_assignments aa ON p.assignment_id = aa.id

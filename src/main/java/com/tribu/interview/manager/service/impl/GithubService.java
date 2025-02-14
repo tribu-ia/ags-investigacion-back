@@ -5,6 +5,7 @@ import com.tribu.interview.manager.service.IGithubService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.kohsuke.github.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
@@ -12,15 +13,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.kohsuke.github.GHContentBuilder;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
-import org.kohsuke.github.GHRef;
-import org.kohsuke.github.GHPullRequest;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -96,25 +92,38 @@ public class GithubService implements IGithubService {
             } catch (IOException e) {
                 log.warn("Branch might already exist: {}", e.getMessage());
             }
-            
-            // Subir el archivo markdown principal
-            repository.createContent()
-                     .branch(branchName)
-                     .path(completeFolderPath + "/" + documentName)
-                     .content(markdownContent)
-                     .message("Add main documentation file")
-                     .commit();
+
+            try {
+                // Subir el archivo markdown principal
+                repository.createContent()
+                        .branch(branchName)
+                        .path(completeFolderPath + "/" + documentName)
+                        .content(markdownContent)
+                        .message("Add main documentation file")
+                        .commit();
+            } catch (Exception e) {
+                log.info("Error");
+            }
+
+
+
             
             // Subir cada documento adjunto
             for (MultipartFile document : documents) {
                 String fileName = sanitizeFileName(document.getOriginalFilename());
-                repository.createContent()
-                         .branch(branchName)
-                         .path(completeFolderPath + "/" + fileName)
-                         .content(document.getBytes())
-                         .message("Add supporting document: " + fileName)
-                         .commit();
-                
+                try {
+                    // Subir el archivo markdown principal
+                    repository.createContent()
+                            .branch(branchName)
+                            .path(completeFolderPath + "/" + fileName)
+                            .content(document.getBytes())
+                            .message("Add supporting document: " + fileName)
+                            .commit();
+
+                } catch (Exception e) {
+                    log.info("Error");
+                }
+
                 log.info("Adding file to commit: {}", fileName);
             }
             
@@ -124,16 +133,24 @@ public class GithubService implements IGithubService {
                                         "- Main documentation file\n" +
                                         "- %d supporting documents", 
                                         researcherName, documents.size());
-            
-            GHPullRequest pullRequest = repository.createPullRequest(
-                prTitle,
-                branchName,
-                "main",
-                prBody
-            );
+            GHPullRequest pullRequest = null;
+            try {
+                // Subir el archivo markdown principal
+
+                pullRequest = repository.createPullRequest(
+                        prTitle,
+                        branchName,
+                        "main",
+                        prBody
+                );
+            } catch (Exception e) {
+                List<GHPullRequest> pullRequests = repository.getPullRequests(GHIssueState.OPEN);
+                pullRequest = pullRequests.stream().filter(ghPullRequest -> prTitle.equalsIgnoreCase(ghPullRequest.getTitle())).findFirst().orElse(null);
+            }
+
             
             log.info("Successfully uploaded {} files to {} and created PR #{}",
-                documents.size() + 1, completeFolderPath, pullRequest.getNumber());
+                documents.size() + 1, completeFolderPath, Objects.requireNonNull(pullRequest).getNumber());
             
             // Retornar la URL del Pull Request en lugar de la carpeta
             return pullRequest.getHtmlUrl().toString();

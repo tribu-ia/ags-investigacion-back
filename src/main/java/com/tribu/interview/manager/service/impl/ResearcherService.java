@@ -65,6 +65,13 @@ public class ResearcherService implements IResearcherService {
         return buildSuccessResponse(researcher, assignment, presentation);
     }
 
+    @Override
+    public Researcher getResearcher(String email) {
+       return researcherRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Investigador no encontrado"));
+
+    }
+
     private Researcher updateExistingResearcher(Researcher existing, ResearcherRequest request, GithubUserResponse githubData) {
         // Actualizar solo si hay cambios en la información
         if (!existing.getGithubUsername().equals(request.getGithubUsername())) {
@@ -234,6 +241,7 @@ public class ResearcherService implements IResearcherService {
                 .repositoryUrl(researcher.getRepositoryUrl())
                 .linkedinProfile(researcher.getLinkedinProfile())
                 .githubUsername(researcher.getGithubUsername())
+                .currentRole(researcher.getCurrentRol())
                 .primaryResearches(mapToPrimaryResearcherResponse(primaryResearches, presentations))
                 .contributorsResearches(contributorResearches)
                 .showOrder(presentations.isEmpty() ? null : presentations.get(0).getShowOrder())
@@ -259,7 +267,7 @@ public class ResearcherService implements IResearcherService {
                             .agentIndustry(research.getIndustry())
                             .presentationDate(presentation.map(p -> p.getPresentationDate().format(DATE_FORMATTER)).orElse(null))
                             .presentationTime(presentation.map(p -> p.getPresentationDate().format(TIME_FORMATTER)).orElse(null))
-                            .status(presentation.map(Presentation::getStatus).orElse(null))
+                            .status(research.getStatus())
                             .presentationWeek(presentation.map(p -> String.valueOf(p.getPresentationWeek())).orElse(null))
                             .build();
                 })
@@ -283,13 +291,11 @@ public class ResearcherService implements IResearcherService {
         }
 
         researcher.setLinkedinProfile(updateDto.getLinkedinProfile());
+        researcher.setCurrentRol(updateDto.getCurrentRole());
 
-        researcher = researcherRepository.save(researcher);
+        researcherRepository.save(researcher);
 
-        Optional<Presentation> presentation = presentationRepository.findCurrentPresentationByResearcherId(researcher.getId());
-        Optional<AgentAssignment> assignment = assignmentRepository.findActiveAssignmentByResearcherId(researcher.getId());
-
-        return null;//buildResearcherDetailDto(researcher, presentation.orElse(null), assignment.orElse(null));
+        return getResearcherDetailsByEmail(email);
     }
 
 } 

@@ -16,6 +16,8 @@ public class AgentResearcherResponseDto {
     private String industry;
     private String shortDescription;
     private String longDescription;
+
     private String role;
     private String assignmentId;
+    private String status;
 }

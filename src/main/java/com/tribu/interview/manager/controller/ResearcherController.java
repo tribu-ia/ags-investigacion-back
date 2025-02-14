@@ -1,6 +1,7 @@
 package com.tribu.interview.manager.controller;
 
 import com.tribu.interview.manager.dto.*;
+import com.tribu.interview.manager.model.Researcher;
 import com.tribu.interview.manager.service.impl.ResearcherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,11 @@ public class ResearcherController {
     public ResponseEntity<ResearcherResponse> createResearcher(
             @Valid @RequestBody ResearcherRequest request) {
         return ResponseEntity.ok(researcherService.createResearcher(request));
+    }
+
+    @GetMapping()
+    public ResponseEntity<Researcher> getResearcher(@RequestParam String email) {
+        return ResponseEntity.ok(researcherService.getResearcher(email));
     }
 
     @GetMapping("/details")

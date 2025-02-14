@@ -19,6 +19,7 @@ public class ResearcherRowMapper implements RowMapper<Researcher> {
             .avatarUrl(rs.getString("avatar_url"))
             .repositoryUrl(rs.getString("repository_url"))
             .linkedinProfile(rs.getString("linkedin_profile"))
+                .currentRol(rs.getString("current_rol"))
             .createdAt(rs.getObject("created_at", LocalDateTime.class))
             .build();
     }

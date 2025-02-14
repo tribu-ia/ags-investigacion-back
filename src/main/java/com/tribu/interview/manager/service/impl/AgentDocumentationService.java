@@ -1,7 +1,6 @@
 package com.tribu.interview.manager.service.impl;
 
 import com.tribu.interview.manager.dto.GitDocumentationDto;
-import com.tribu.interview.manager.model.AIAgent;
 import com.tribu.interview.manager.model.AgentAssignment;
 import com.tribu.interview.manager.model.AgentDocumentation;
 import com.tribu.interview.manager.dto.SaveMarkdownRequest;
@@ -70,7 +69,10 @@ public class AgentDocumentationService {
         // Actualizar estado y guardar
         documentation.setStatus("COMPLETED");
         documentationRepository.save(documentation);
-        
+
+
+        assignmentRepository.updateStatusById(assignment.getId(), "done");
+
         log.info("Documentation finalized and uploaded to GitHub: {}", githubUrl);
         
         return GitDocumentationDto.builder()

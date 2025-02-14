@@ -14,7 +14,7 @@ public class ResearcherDetailDto {
     private String avatarUrl;
     private String repositoryUrl;
     private String linkedinProfile;
-    private String role;
+    private String currentRole;
     private String githubUsername;
     private List<AgentPrimaryResearcherResponseDto> primaryResearches;
     private List<AgentResearcherResponseDto> contributorsResearches;

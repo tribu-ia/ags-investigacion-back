@@ -21,17 +21,17 @@ public class JdbcResearcherRepository {
 
     private static final String SELECT_BASE = """
         SELECT id, name, email, phone, github_username, avatar_url, 
-               repository_url, linkedin_profile
+               repository_url, linkedin_profile, current_rol
         FROM investigadores
     """;
 
     private static final String INSERT_SQL = """
         INSERT INTO investigadores (
             id, name, email, phone, github_username, 
-            avatar_url, repository_url, linkedin_profile
+            avatar_url, repository_url, linkedin_profile, current_rol
         ) VALUES (
             :id, :name, :email, :phone, :githubUsername,
-            :avatarUrl, :repositoryUrl, :linkedinProfile
+            :avatarUrl, :repositoryUrl, :linkedinProfile, :currentRol
         )
     """;
 
@@ -43,7 +43,8 @@ public class JdbcResearcherRepository {
             github_username = :githubUsername,
             avatar_url = :avatarUrl,
             repository_url = :repositoryUrl,
-            linkedin_profile = :linkedinProfile
+            linkedin_profile = :linkedinProfile,
+            current_rol = :currentRol
         WHERE id = :id
     """;
 
@@ -87,6 +88,7 @@ public class JdbcResearcherRepository {
                     .avatarUrl(rs.getString("avatar_url"))
                     .repositoryUrl(rs.getString("repository_url"))
                     .linkedinProfile(rs.getString("linkedin_profile"))
+                        .currentRol(rs.getString("current_rol"))
                     .build()
             ));
         } catch (EmptyResultDataAccessException e) {
@@ -135,7 +137,8 @@ public class JdbcResearcherRepository {
             .addValue("githubUsername", researcher.getGithubUsername())
             .addValue("avatarUrl", researcher.getAvatarUrl())
             .addValue("repositoryUrl", researcher.getRepositoryUrl())
-            .addValue("linkedinProfile", researcher.getLinkedinProfile());
+            .addValue("linkedinProfile", researcher.getLinkedinProfile())
+                .addValue("currentRol", researcher.getCurrentRol());
     }
 
     public boolean existsByEmail(String email) {
