@@ -16,4 +16,5 @@ public class PresentationController {
     public ResponseEntity<WeekPresentationsResponse> getCurrentWeekPresentations() {
         return ResponseEntity.ok(presentationService.getCurrentWeekPresentations());
     }
+
 } 

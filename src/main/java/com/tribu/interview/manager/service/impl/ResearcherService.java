@@ -72,6 +72,32 @@ public class ResearcherService implements IResearcherService {
 
     }
 
+    @Override
+    @Transactional
+    public ResearcherResponse createNewAgentAssignmentRequest(SimpleResearcherRequest request) {
+        log.info("Creating new agent assignment for researcher with email: {}", request.getEmail());
+
+        // Obtener investigador existente
+        Researcher researcher = researcherRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, 
+                "Investigador no encontrado. Debe registrarse primero"));
+
+        validateAgentExists(request.getAgentId());
+
+        // Create assignment and schedule presentation
+        AgentAssignment assignment = createAgentAssignment(researcher, request.getAgentId(), request.getRole());
+        log.info("Assignment created for researcher: {} and agent: {}", 
+            researcher.getId(), request.getAgentId());
+
+        Presentation presentation = null;
+        if (assignment.getRole().equalsIgnoreCase("PRIMARY")) {
+            presentation = presentationService.createPresentation(assignment);
+            log.info("Presentation scheduled for week: {}", presentation);
+        }
+        
+        return buildSuccessResponse(researcher, assignment, presentation);
+    }
+
     private Researcher updateExistingResearcher(Researcher existing, ResearcherRequest request, GithubUserResponse githubData) {
         // Actualizar solo si hay cambios en la información
         if (!existing.getGithubUsername().equals(request.getGithubUsername())) {
@@ -84,6 +110,10 @@ public class ResearcherService implements IResearcherService {
         }
         if (!existing.getLinkedinProfile().equals(request.getLinkedinProfile())) {
             existing.setLinkedinProfile(request.getLinkedinProfile());
+        }
+
+        if (!existing.getCurrentRol().equals(request.getCurrentRol())){
+            existing.setCurrentRol(request.getCurrentRol());
         }
         
         return researcherRepository.save(existing);
@@ -120,6 +150,7 @@ public class ResearcherService implements IResearcherService {
             .repositoryUrl(githubData.getHtmlUrl())
             .linkedinProfile(request.getLinkedinProfile())
             .createdAt(LocalDateTime.now())
+                .currentRol(request.getCurrentRol())
             .build();
     }
 

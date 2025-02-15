@@ -39,4 +39,7 @@ public class ResearcherRequest {
 
     @JsonProperty("researcher_type")
     private String role;
+
+    @JsonProperty("current_role")
+    private String currentRol;
 } 

@@ -20,6 +20,7 @@ public class ResearcherController {
         return ResponseEntity.ok(researcherService.createResearcher(request));
     }
 
+
     @GetMapping()
     public ResponseEntity<Researcher> getResearcher(@RequestParam String email) {
         return ResponseEntity.ok(researcherService.getResearcher(email));
@@ -28,6 +29,11 @@ public class ResearcherController {
     @GetMapping("/details")
     public ResponseEntity<ResearcherDetailDto> getResearcherDetails(@RequestParam String email) {
         return ResponseEntity.ok(researcherService.getResearcherDetailsByEmail(email));
+    }
+
+    @PostMapping("/assign-agent")
+    public ResponseEntity<ResearcherResponse> createNewAgentAssignmentRequest(@Valid @RequestBody SimpleResearcherRequest simpleResearcherRequest) {
+        return ResponseEntity.ok(researcherService.createNewAgentAssignmentRequest(simpleResearcherRequest));
     }
 
     @PutMapping("/{email}/profile")
