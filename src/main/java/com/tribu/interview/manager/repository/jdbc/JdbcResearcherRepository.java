@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.dao.EmptyResultDataAccessException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +70,8 @@ public class JdbcResearcherRepository {
                 avatar_url,
                 repository_url,
                 linkedin_profile,
-                current_rol
+                current_rol,
+                created_at
             FROM investigadores
             WHERE email = :email
         """;
@@ -88,7 +90,8 @@ public class JdbcResearcherRepository {
                     .avatarUrl(rs.getString("avatar_url"))
                     .repositoryUrl(rs.getString("repository_url"))
                     .linkedinProfile(rs.getString("linkedin_profile"))
-                        .currentRol(rs.getString("current_rol"))
+                    .currentRol(rs.getString("current_rol"))
+                    .createdAt(LocalDateTime.parse(rs.getString("created_at").replace(" ", "T")))
                     .build()
             ));
         } catch (EmptyResultDataAccessException e) {
@@ -138,7 +141,9 @@ public class JdbcResearcherRepository {
             .addValue("avatarUrl", researcher.getAvatarUrl())
             .addValue("repositoryUrl", researcher.getRepositoryUrl())
             .addValue("linkedinProfile", researcher.getLinkedinProfile())
-                .addValue("currentRol", researcher.getCurrentRol());
+                .addValue("currentRol", researcher.getCurrentRol())
+                .addValue("phone", researcher.getPhone());
+
     }
 
     public boolean existsByEmail(String email) {

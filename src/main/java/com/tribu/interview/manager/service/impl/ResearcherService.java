@@ -323,6 +323,7 @@ public class ResearcherService implements IResearcherService {
 
         researcher.setLinkedinProfile(updateDto.getLinkedinProfile());
         researcher.setCurrentRol(updateDto.getCurrentRole());
+        researcher.setPhone(updateDto.getPhone());
 
         researcherRepository.save(researcher);
 
