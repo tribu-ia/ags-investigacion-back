@@ -22,5 +22,7 @@ public class AgentPrimaryResearcherResponseDto {
     private String agentDescription;
     private String agentCategory;
     private String agentIndustry;
+    // PresentationVideo
+    private Integer showOrder;
 
 }

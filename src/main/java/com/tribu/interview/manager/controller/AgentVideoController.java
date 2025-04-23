@@ -5,7 +5,6 @@ import com.tribu.interview.manager.dto.UploadVideoRequest;
 import com.tribu.interview.manager.dto.ChallengeStatusResponse;
 import com.tribu.interview.manager.service.impl.PresentationVideoService;
 import com.tribu.interview.manager.service.impl.ConfigParamsService;
-import com.tribu.interview.manager.repository.jdbc.JdbcConfigParamsRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

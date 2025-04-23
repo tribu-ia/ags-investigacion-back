@@ -275,7 +275,6 @@ public class ResearcherService implements IResearcherService {
                 .currentRole(researcher.getCurrentRol())
                 .primaryResearches(mapToPrimaryResearcherResponse(primaryResearches, presentations))
                 .contributorsResearches(contributorResearches)
-                .showOrder(presentations.isEmpty() ? null : presentations.get(0).getShowOrder())
                 .build();
     }
 
@@ -300,6 +299,7 @@ public class ResearcherService implements IResearcherService {
                             .presentationTime(presentation.map(p -> p.getPresentationDate().format(TIME_FORMATTER)).orElse(null))
                             .status(research.getStatus())
                             .presentationWeek(presentation.map(p -> String.valueOf(p.getPresentationWeek())).orElse(null))
+                            .showOrder(presentation.map(Presentation::getShowOrder).orElse(null))
                             .build();
                 })
                 .toList();

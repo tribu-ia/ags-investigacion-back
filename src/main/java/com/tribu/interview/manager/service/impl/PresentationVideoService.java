@@ -83,11 +83,11 @@ public class PresentationVideoService {
             throw new IllegalStateException("Videos can only be uploaded for active assignments");
         }
         
-        // Validar que estamos en el período de carga de videos (primera semana después de la asignación)
-        LocalDate uploadDeadline = assignment.getAssignedAt().toLocalDate().plusWeeks(1);
-        if (LocalDate.now().isAfter(uploadDeadline)) {
-            throw new IllegalStateException("Video upload period has ended");
-        }
+//        // Validar que estamos en el período de carga de videos (primera semana después de la asignación)
+//        LocalDate uploadDeadline = assignment.getAssignedAt().toLocalDate().plusWeeks(1);
+//        if (LocalDate.now().isAfter(uploadDeadline)) {
+//            throw new IllegalStateException("Video upload period has ended");
+//        }
     }
     
     private PresentationVideoResponse mapToVideoResponse(PresentationVideo video) {
@@ -107,7 +107,6 @@ public class PresentationVideoService {
             .votesCount(video.getVotesCount())
             .build();
     }
-
 
     public PresentationVideoResponse registerVote(String videoId, String voterId) {
         // Validar que el video existe
